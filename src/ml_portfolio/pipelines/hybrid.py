@@ -159,9 +159,9 @@ class HybridLSTM(SklearnTorchWrapper):
             **kwargs: Additional arguments for wrapper
         """
         try:
-            from ..models.forecasting.lstm import SimpleLSTM
+            from ..models.lstm import LSTMForecaster
 
-            model_class = SimpleLSTM
+            model_class = LSTMForecaster
         except ImportError:
             warnings.warn("LSTM model not available, using placeholder")
             model_class = None
@@ -188,9 +188,9 @@ class HybridTransformer(SklearnTorchWrapper):
             **kwargs: Additional arguments for wrapper
         """
         try:
-            from ..models.forecasting.transformer import SimpleTransformer
+            from ..models.transformer import TransformerForecaster
 
-            model_class = SimpleTransformer
+            model_class = TransformerForecaster
         except ImportError:
             warnings.warn("Transformer model not available, using placeholder")
             model_class = None
