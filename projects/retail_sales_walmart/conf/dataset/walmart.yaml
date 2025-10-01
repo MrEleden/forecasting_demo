@@ -1,0 +1,24 @@
+# @package _global_
+
+# Walmart dataset configuration
+dataset:
+  name: walmart
+  file_path: data/raw/Walmart.csv
+  date_column: Date
+  target_column: Weekly_Sales
+  store_column: Store
+  dept_column: null  # This dataset doesn't have departments
+  
+  # Time series parameters
+  frequency: 'W'  # Weekly data
+  train_size: 0.8
+  validation_size: 0.1
+  test_size: 0.1
+  
+  # Data preprocessing
+  fillna_method: 'forward'
+  remove_outliers: false
+  log_transform: false
+  
+  # Aggregation (if needed)
+  aggregate_by: null  # null, 'store', 'dept', 'total'

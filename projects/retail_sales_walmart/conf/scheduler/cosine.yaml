@@ -1,0 +1,8 @@
+# @package _global_
+
+# Cosine annealing scheduler (not used for ARIMA but required by config)
+_target_: torch.optim.lr_scheduler.CosineAnnealingLR
+
+# Scheduler parameters
+T_max: 100
+eta_min: 0.00001

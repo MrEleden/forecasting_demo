@@ -1,0 +1,10 @@
+# Development Requirements
+-r requirements.txt
+
+# Code Quality
+ruff>=0.1.0
+black>=22.0.0
+pytest>=7.0.0
+
+# Jupyter
+jupyter>=1.0.0

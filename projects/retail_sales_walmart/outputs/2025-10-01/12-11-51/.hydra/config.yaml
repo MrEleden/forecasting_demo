@@ -1,0 +1,48 @@
+dataset:
+  name: walmart
+  file_path: data/raw/Walmart.csv
+  date_column: Date
+  target_column: Weekly_Sales
+  store_column: Store
+  dept_column: Dept
+  frequency: W
+  train_size: 0.8
+  validation_size: 0.1
+  test_size: 0.1
+  fillna_method: forward
+  remove_outliers: false
+  log_transform: false
+  aggregate_by: null
+_target_: torch.optim.lr_scheduler.CosineAnnealingLR
+order:
+- 1
+- 1
+- 1
+seasonal_order:
+- 0
+- 0
+- 0
+- 0
+trend: null
+enforce_stationarity: true
+enforce_invertibility: true
+concentrate_scale: false
+lr: 0.001
+betas:
+- 0.9
+- 0.999
+eps: 1.0e-08
+weight_decay: 0
+T_max: 100
+eta_min: 1.0e-05
+experiment:
+  name: retail_sales_walmart_baseline
+  tags:
+  - baseline
+  - walmart
+trainer:
+  max_epochs: 100
+  patience: 10
+evaluation:
+  primary_metric: WMAE
+  cv_folds: 5

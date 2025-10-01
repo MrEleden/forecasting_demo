@@ -1,0 +1,14 @@
+# @package _global_
+
+# ARIMA model configuration
+_target_: ml_portfolio.models.statistical.ARIMAWrapper
+
+# ARIMA parameters
+order: [1, 1, 1]  # (p, d, q) - autoregressive, differencing, moving average
+seasonal_order: [0, 0, 0, 0]  # (P, D, Q, s) - seasonal ARIMA parameters
+trend: null  # null, 'c' (constant), 't' (linear trend), 'ct' (both)
+
+# Advanced parameters
+enforce_stationarity: true
+enforce_invertibility: true
+concentrate_scale: false

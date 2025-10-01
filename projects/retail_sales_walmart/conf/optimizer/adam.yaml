@@ -1,0 +1,10 @@
+# @package _global_
+
+# Adam optimizer (not used for ARIMA but required by config)
+_target_: torch.optim.Adam
+
+# Optimizer parameters
+lr: 0.001
+betas: [0.9, 0.999]
+eps: 1e-08
+weight_decay: 0

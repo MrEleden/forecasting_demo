@@ -1,0 +1,24 @@
+# Main configuration for transportation_tsi
+# This file defines default settings for all experiments
+
+defaults:
+  - dataset: tsi
+  - model: lstm
+  - optimizer: adam
+  - scheduler: cosine
+  - _self_
+
+# Experiment settings
+experiment:
+  name: transportation_tsi_baseline
+  tags: [baseline, tsi]
+
+# Training settings  
+trainer:
+  max_epochs: 100
+  patience: 10
+  
+# Evaluation settings
+evaluation:
+  primary_metric: RMSE
+  cv_folds: 5

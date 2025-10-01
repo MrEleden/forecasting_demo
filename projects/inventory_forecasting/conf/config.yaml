@@ -1,0 +1,24 @@
+# Main configuration for inventory_forecasting
+# This file defines default settings for all experiments
+
+defaults:
+  - dataset: inventory
+  - model: lstm
+  - optimizer: adam
+  - scheduler: cosine
+  - _self_
+
+# Experiment settings
+experiment:
+  name: inventory_forecasting_baseline
+  tags: [baseline, inventory]
+
+# Training settings  
+trainer:
+  max_epochs: 100
+  patience: 10
+  
+# Evaluation settings
+evaluation:
+  primary_metric: MAPE
+  cv_folds: 5
