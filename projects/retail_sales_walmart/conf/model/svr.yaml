@@ -1,0 +1,17 @@
+# Support Vector Regression model configuration
+
+_target_: sklearn.svm.SVR
+
+# Model hyperparameters
+kernel: "rbf"
+C: 100.0
+gamma: "scale"
+epsilon: 0.1
+degree: 3
+
+# Advanced settings
+tol: 1e-3
+cache_size: 200
+coef0: 0.0
+shrinking: true
+max_iter: -1

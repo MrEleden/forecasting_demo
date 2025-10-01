@@ -1,0 +1,29 @@
+# Walmart custom dataset configuration
+# Using the WalmartTimeSeriesDataset with inheritance pattern
+
+_target_: walmart_dataset.WalmartTimeSeriesDataset
+
+# Dataset configuration
+aggregate_stores: true
+include_economic_features: true
+include_weather_features: true
+
+# Time series windows
+lookback_window: 52    # 1 year of weekly data
+forecast_horizon: 4    # 4 weeks ahead
+
+# Data paths (relative to project root)
+data_path: "data/raw/Walmart.csv"
+
+# Preprocessing options
+normalize: true
+handle_missing: "interpolate"
+
+# Validation split
+train_ratio: 0.8
+validation_ratio: 0.1
+test_ratio: 0.1
+
+# Additional features
+seasonal_features: true
+holiday_effects: true

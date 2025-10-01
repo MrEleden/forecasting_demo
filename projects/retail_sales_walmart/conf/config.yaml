@@ -2,8 +2,8 @@
 # This file defines default settings for all experiments
 
 defaults:
-  - dataset: walmart
-  - model: arima
+  - dataset: walmart_custom
+  - model: random_forest
   - optimizer: adam
   - scheduler: cosine
   - _self_

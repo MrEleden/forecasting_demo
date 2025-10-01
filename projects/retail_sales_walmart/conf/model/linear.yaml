@@ -1,0 +1,9 @@
+# Linear Regression model configuration
+
+_target_: sklearn.linear_model.LinearRegression
+
+# Model hyperparameters
+fit_intercept: true
+copy_X: true
+n_jobs: null
+positive: false

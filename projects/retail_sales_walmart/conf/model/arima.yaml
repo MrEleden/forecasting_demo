@@ -1,7 +1,6 @@
-# @package _global_
-
 # ARIMA model configuration
-_target_: ml_portfolio.models.statistical.ARIMAWrapper
+
+_target_: ml_portfolio.models.statistical.statistical.ARIMAWrapper
 
 # ARIMA parameters
 order: [1, 1, 1]  # (p, d, q) - autoregressive, differencing, moving average
