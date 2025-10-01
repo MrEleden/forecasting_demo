@@ -2,7 +2,7 @@
 
 This module contains neural network-based forecasting models such as:
 - LSTM (Long Short-Term Memory networks)
-- TCN (Temporal Convolutional Networks) 
+- TCN (Temporal Convolutional Networks)
 - Transformer models for time series forecasting
 - Seq2Seq architectures
 """

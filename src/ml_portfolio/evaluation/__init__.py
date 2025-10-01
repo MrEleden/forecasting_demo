@@ -10,7 +10,7 @@ from .plots import (
     plot_learning_curves,
     plot_feature_importance,
     plot_cross_validation_scores,
-    plot_forecast_decomposition,
+    plot_timeseries_decomposition,
     plot_correlation_matrix,
     plot_prediction_intervals,
 )
@@ -26,7 +26,7 @@ __all__ = [
     "plot_learning_curves",
     "plot_feature_importance",
     "plot_cross_validation_scores",
-    "plot_forecast_decomposition",
+    "plot_timeseries_decomposition",
     "plot_correlation_matrix",
     "plot_prediction_intervals",
 ]

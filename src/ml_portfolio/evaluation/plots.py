@@ -263,7 +263,7 @@ def plot_cross_validation_scores(cv_results: Dict[str, np.ndarray], figsize: Tup
     return fig
 
 
-def plot_forecast_decomposition(
+def plot_timeseries_decomposition(
     data: pd.Series, model_type: str = "additive", figsize: Tuple[int, int] = (12, 10)
 ) -> plt.Figure:
     """

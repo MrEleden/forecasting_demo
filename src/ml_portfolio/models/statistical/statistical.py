@@ -129,16 +129,16 @@ class ARIMAWrapper(BaseEstimator, RegressorMixin):
             # Return last known value repeated as fallback
             return np.full(steps, self.y_.iloc[-1])
 
-    def forecast(self, steps: int = 1, alpha: float = 0.05):
+    def predict_with_intervals(self, steps: int = 1, alpha: float = 0.05):
         """
-        Make forecast with confidence intervals.
+        Make predictions with confidence intervals.
 
         Args:
-            steps: Number of steps to forecast
+            steps: Number of steps to predict
             alpha: Significance level for confidence intervals
 
         Returns:
-            Dictionary with forecast, confidence intervals, and dates
+            Dictionary with predictions, confidence intervals, and dates
         """
         if not self.is_fitted_:
             raise ValueError("Model must be fitted before forecasting")
@@ -150,20 +150,20 @@ class ARIMAWrapper(BaseEstimator, RegressorMixin):
             conf_int = forecast_result.conf_int()
 
             return {
-                "forecast": forecast.values if hasattr(forecast, "values") else forecast,
+                "predictions": forecast.values if hasattr(forecast, "values") else forecast,
                 "lower_ci": conf_int.iloc[:, 0].values if hasattr(conf_int, "iloc") else conf_int[:, 0],
                 "upper_ci": conf_int.iloc[:, 1].values if hasattr(conf_int, "iloc") else conf_int[:, 1],
-                "forecast_dates": forecast.index if hasattr(forecast, "index") else None,
+                "prediction_dates": forecast.index if hasattr(forecast, "index") else None,
             }
         except Exception as e:
-            warnings.warn(f"ARIMA forecast with CI failed: {e}")
-            # Fallback to simple forecast
-            simple_forecast = self.predict(steps)
+            warnings.warn(f"ARIMA prediction with intervals failed: {e}")
+            # Fallback to simple prediction
+            simple_prediction = self.predict(steps)
             return {
-                "forecast": simple_forecast,
-                "lower_ci": simple_forecast * 0.9,  # Simple approximation
-                "upper_ci": simple_forecast * 1.1,
-                "forecast_dates": None,
+                "predictions": simple_prediction,
+                "lower_ci": simple_prediction * 0.9,  # Simple approximation
+                "upper_ci": simple_prediction * 1.1,
+                "prediction_dates": None,
             }
 
     def get_params(self, deep=True):

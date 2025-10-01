@@ -12,6 +12,7 @@ from .registry import *
 # Try to import statistical models (optional dependencies)
 try:
     from .statistical import *
+
     STATISTICAL_AVAILABLE = True
 except ImportError:
     STATISTICAL_AVAILABLE = False
@@ -19,6 +20,7 @@ except ImportError:
 # Try to import deep learning models (optional PyTorch dependency)
 try:
     from .deep_learning import *
+
     PYTORCH_AVAILABLE = True
 except ImportError:
     PYTORCH_AVAILABLE = False

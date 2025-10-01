@@ -132,8 +132,6 @@ This project uses **Poetry** for modern Python dependency management, providing 
 ### Core Poetry Files
 - **`pyproject.toml`**: Main project configuration defining dependencies, build settings, and tool configurations
 - **`poetry.lock`**: Lock file ensuring exact dependency versions across environments (commit to Git)
-- **`requirements.txt`**: Generated fallback for deployment environments without Poetry
-- **`requirements-dev.txt`**: Generated development dependencies for legacy systems
 
 ### Dependency Groups and Organization
 ```toml

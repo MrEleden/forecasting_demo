@@ -222,15 +222,15 @@ def evaluate_model(model, val_data: pd.Series, test_data: pd.Series):
     print(f"  MAE: {test_mae:.2f}")
     print(f"  MAPE: {test_mape:.2f}%")
 
-    # Create forecast with confidence intervals
+    # Create predictions with confidence intervals
     try:
-        forecast_result = model.forecast(steps=len(test_data), alpha=0.05)
-        print(f"\nForecast with 95% confidence intervals:")
-        print(f"  Mean forecast: {forecast_result['forecast'][:5]} ... (showing first 5)")
-        print(f"  Lower CI: {forecast_result['lower_ci'][:5]} ... (showing first 5)")
-        print(f"  Upper CI: {forecast_result['upper_ci'][:5]} ... (showing first 5)")
+        prediction_result = model.predict_with_intervals(steps=len(test_data), alpha=0.05)
+        print(f"\nPredictions with 95% confidence intervals:")
+        print(f"  Mean predictions: {prediction_result['predictions'][:5]} ... (showing first 5)")
+        print(f"  Lower CI: {prediction_result['lower_ci'][:5]} ... (showing first 5)")
+        print(f"  Upper CI: {prediction_result['upper_ci'][:5]} ... (showing first 5)")
     except Exception as e:
-        print(f"Error generating forecast with CI: {e}")
+        print(f"Error generating predictions with CI: {e}")
 
     return {
         "val_metrics": {"rmse": val_rmse, "mae": val_mae, "mape": val_mape},
