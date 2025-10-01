@@ -309,7 +309,7 @@ def create_walmart_dataset(dataset_type: str = "single", **kwargs):
 
 # Usage examples
 if __name__ == "__main__":
-    print("🏪 Walmart Dataset Examples")
+    print("Walmart Dataset Examples")
     print("=" * 40)
 
     # Example 1: Aggregated dataset
@@ -333,4 +333,4 @@ if __name__ == "__main__":
 
     print(f"Multi-store dataset: {len(walmart_multi)} sequences")
 
-    print("\n✅ All Walmart datasets created successfully!")
+    print("\nAll Walmart datasets created successfully!")

@@ -8,12 +8,3 @@ hidden_size: 64
 num_layers: 2
 output_size: 4  # 4-week forecast horizon
 dropout: 0.2
-bidirectional: false
-
-# Training specific
-batch_first: true
-device: "auto"  # Will use cuda if available
-
-# Model behavior
-return_sequences: false
-activation: "tanh"

@@ -106,7 +106,7 @@ def is_deep_learning_model(model_name):
 
 def train_sklearn_model(model, X_train, X_test, y_train, y_test, cfg):
     """Train sklearn-compatible model."""
-    print(f"🔄 Training {cfg.model._target_.split('.')[-1]}...")
+    print(f"Training {cfg.model._target_.split('.')[-1]}...")
 
     # Scale data for models that need it
     model_name = cfg.model._target_.split(".")[-1].lower()
@@ -131,7 +131,7 @@ def train_sklearn_model(model, X_train, X_test, y_train, y_test, cfg):
 
 def train_pytorch_model(model, X_train, X_test, y_train, y_test, cfg):
     """Train PyTorch model (LSTM, etc.)."""
-    print(f"🧠 Training {cfg.model._target_.split('.')[-1]}...")
+    print(f"Training {cfg.model._target_.split('.')[-1]}...")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
@@ -184,30 +184,30 @@ def train_pytorch_model(model, X_train, X_test, y_train, y_test, cfg):
 def train(cfg: DictConfig) -> None:
     """Main training function using Hydra configuration."""
 
-    print("🏪 Walmart Forecasting with Hydra Configuration")
+    print("Walmart Forecasting with Hydra Configuration")
     print("=" * 70)
 
     # Print configuration
-    print("📋 Configuration:")
+    print("Configuration:")
     print(f"   Dataset: {cfg.dataset._target_.split('.')[-1]}")
     print(f"   Model: {cfg.model._target_.split('.')[-1]}")
     print(f"   Lookback Window: {cfg.dataset.lookback_window}")
     print(f"   Forecast Horizon: {cfg.dataset.forecast_horizon}")
 
     # Create dataset using Hydra instantiation
-    print(f"\n📊 Creating dataset...")
+    print(f"\nCreating dataset...")
     dataset = hydra.utils.instantiate(cfg.dataset)
-    print(f"✅ Dataset: {len(dataset)} sequences")
+    print(f"Dataset: {len(dataset)} sequences")
 
     # Get dataset insights
     if hasattr(dataset, "get_walmart_insights"):
         insights = dataset.get_walmart_insights()
-        print(f"📈 Average weekly sales: ${insights['sales_statistics']['mean_weekly_sales']:,.0f}")
+        print(f"Average weekly sales: ${insights['sales_statistics']['mean_weekly_sales']:,.0f}")
 
     # Create model using Hydra instantiation
-    print(f"\n🤖 Creating model...")
+    print(f"\nCreating model...")
     model = hydra.utils.instantiate(cfg.model)
-    print(f"✅ Model: {cfg.model._target_.split('.')[-1]}")
+    print(f"Model: {cfg.model._target_.split('.')[-1]}")
 
     # Prepare data based on model type
     model_name = cfg.model._target_.split(".")[-1].lower()
@@ -221,7 +221,7 @@ def train(cfg: DictConfig) -> None:
         X_train, X_test = X[:split_idx], X[split_idx:]
         y_train, y_test = y[:split_idx], y[split_idx:]
 
-        print(f"🔄 PyTorch data prepared: {X.shape} → {y.shape}")
+        print(f"PyTorch data prepared: {X.shape} -> {y.shape}")
 
         # Train PyTorch model
         y_pred_train, y_pred_test, training_time = train_pytorch_model(model, X_train, X_test, y_train, y_test, cfg)
@@ -241,7 +241,7 @@ def train(cfg: DictConfig) -> None:
         X_train, X_test = X[:split_idx], X[split_idx:]
         y_train, y_test = y[:split_idx], y[split_idx:]
 
-        print(f"🔄 Sklearn data prepared: {X.shape} → {y.shape}")
+        print(f"Sklearn data prepared: {X.shape} -> {y.shape}")
 
         # Train sklearn model
         y_pred_train, y_pred_test, training_time = train_sklearn_model(model, X_train, X_test, y_train, y_test, cfg)
@@ -250,28 +250,28 @@ def train(cfg: DictConfig) -> None:
         y_train_orig, y_test_orig = y_train, y_test
         y_pred_train_orig, y_pred_test_orig = y_pred_train, y_pred_test
 
-    print(f"✅ Training completed in {training_time:.2f}s")
+    print(f"Training completed in {training_time:.2f}s")
 
     # Calculate metrics
     train_metrics = calculate_metrics(y_train_orig, y_pred_train_orig)
     test_metrics = calculate_metrics(y_test_orig, y_pred_test_orig)
 
     # Display results
-    print(f"\n📊 Results:")
+    print(f"\nResults:")
     print("-" * 40)
-    print(f"📚 Training Metrics:")
+    print(f"Training Metrics:")
     print(f"   MAE:  ${train_metrics['MAE']:,.0f}")
     print(f"   RMSE: ${train_metrics['RMSE']:,.0f}")
     print(f"   MAPE: {train_metrics['MAPE']:.2f}%")
 
-    print(f"\n🧪 Test Metrics:")
+    print(f"\nTest Metrics:")
     print(f"   MAE:  ${test_metrics['MAE']:,.0f}")
     print(f"   RMSE: ${test_metrics['RMSE']:,.0f}")
     print(f"   MAPE: {test_metrics['MAPE']:.2f}%")
     print(f"   Directional Accuracy: {test_metrics['Directional_Accuracy']:.1f}%")
 
     # Sample predictions
-    print(f"\n🎯 Sample Predictions:")
+    print(f"\nSample Predictions:")
     print("-" * 35)
     n_samples = min(5, len(y_test_orig))
     for i in range(n_samples):
@@ -282,7 +282,7 @@ def train(cfg: DictConfig) -> None:
 
     # Feature importance for tree-based models
     if hasattr(model, "feature_importances_"):
-        print(f"\n🔍 Top 10 Most Important Features:")
+        print(f"\nTop 10 Most Important Features:")
         print("-" * 35)
         feature_names = [f"week_{i+1}" for i in range(cfg.dataset.lookback_window)]
         feature_importance = pd.DataFrame(
@@ -292,9 +292,9 @@ def train(cfg: DictConfig) -> None:
         for i, (_, row) in enumerate(feature_importance.head(10).iterrows()):
             print(f"{i+1:2d}. {row['feature']:10s}: {row['importance']:.4f}")
 
-    print(f"\n✅ Training Complete!")
-    print(f"🎯 Best metric: {test_metrics['MAPE']:.2f}% MAPE")
-    print(f"💡 Custom Walmart dataset with {cfg.model._target_.split('.')[-1]} model")
+    print(f"\nTraining Complete!")
+    print(f"Best metric: {test_metrics['MAPE']:.2f}% MAPE")
+    print(f"Custom Walmart dataset with {cfg.model._target_.split('.')[-1]} model")
 
     # Return metrics for Hydra multirun
     return test_metrics["MAPE"]
