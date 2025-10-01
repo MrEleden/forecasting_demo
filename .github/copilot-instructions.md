@@ -270,18 +270,6 @@ poetry install                   # Recreate environment
 poetry cache clear pypi --all    # Clear package cache
 ```
 
-### Legacy Requirements Support
-For environments without Poetry support, maintain generated requirements files:
-```bash
-# Generate requirements for deployment
-poetry export -f requirements.txt --output requirements.txt --without dev
-poetry export --with dev -f requirements.txt --output requirements-dev.txt
-
-# Install from requirements (fallback)
-pip install -r requirements.txt
-pip install -r requirements-dev.txt  # Development environment
-```
-
 ## Architecture Principles
 - **Shared Library**: `src/ml_portfolio/` contains reusable forecasting components
 - **Self-Contained Projects**: Each `projects/*/` is independent with its own data, notebooks, configs
