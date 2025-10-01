@@ -1,5 +1,13 @@
 """
 Hybrid pipelines combining sklearn preprocessing with PyTorch models.
+
+This module provides base classes for hybrid forecasting pipelines that projects should inherit from.
+Project-specific classes should extend these base classes for domain-specific customization.
+
+Example inheritance patterns:
+    - WalmartHybridLSTM(HybridLSTM)
+    - OlaHybridTransformer(HybridTransformer)
+    - InventoryEnsembleHybrid(EnsembleHybrid)
 """
 
 import numpy as np
@@ -13,7 +21,25 @@ import warnings
 
 class SklearnTorchWrapper(BaseEstimator, RegressorMixin):
     """
-    Wrapper to make PyTorch models compatible with sklearn pipelines.
+    Base wrapper to make PyTorch models compatible with sklearn pipelines.
+
+    This is a BASE CLASS that projects should inherit from for domain-specific customization.
+
+    Project-specific inheritance pattern:
+        class WalmartLSTMWrapper(SklearnTorchWrapper):
+            def __init__(self, **kwargs):
+                # Walmart-specific model parameters
+                model_params = {'hidden_size': 64, 'num_layers': 2}
+                super().__init__(model_class=LSTMForecaster, model_params=model_params, **kwargs)
+
+            def _preprocess_walmart_data(self, X):
+                # Walmart-specific preprocessing
+                return X
+
+    Methods that projects commonly override:
+        - fit(): Add domain-specific data preprocessing
+        - predict(): Add domain-specific postprocessing
+        - _get_model_params(): Customize model architecture for domain
     """
 
     def __init__(
@@ -51,13 +77,10 @@ class SklearnTorchWrapper(BaseEstimator, RegressorMixin):
         Returns:
             self
         """
-        try:
-            import torch
-            import torch.nn as nn
-            import torch.optim as optim
-            from torch.utils.data import DataLoader, TensorDataset
-        except ImportError:
-            raise ImportError("PyTorch is required for hybrid pipelines")
+        import torch
+        import torch.nn as nn
+        import torch.optim as optim
+        from torch.utils.data import DataLoader, TensorDataset
 
         # Convert to numpy arrays
         X = np.array(X)
@@ -107,6 +130,41 @@ class SklearnTorchWrapper(BaseEstimator, RegressorMixin):
 
         return self
 
+    def _get_model_params(self):
+        """
+        Get model parameters. Override in project-specific classes for customization.
+
+        Returns:
+            Dict of model parameters
+        """
+        return self.model_params.copy()
+
+    def _preprocess_features(self, X):
+        """
+        Preprocess features before model fitting/prediction.
+        Override in project-specific classes for domain-specific preprocessing.
+
+        Args:
+            X: Features to preprocess
+
+        Returns:
+            Preprocessed features
+        """
+        return X
+
+    def _postprocess_predictions(self, predictions):
+        """
+        Postprocess predictions after model prediction.
+        Override in project-specific classes for domain-specific postprocessing.
+
+        Args:
+            predictions: Raw model predictions
+
+        Returns:
+            Postprocessed predictions
+        """
+        return predictions
+
     def predict(self, X):
         """
         Make predictions with the fitted model.
@@ -120,10 +178,10 @@ class SklearnTorchWrapper(BaseEstimator, RegressorMixin):
         if self.model_ is None:
             raise ValueError("Model must be fitted before making predictions")
 
-        try:
-            import torch
-        except ImportError:
-            raise ImportError("PyTorch is required for hybrid pipelines")
+        import torch
+
+        # Apply project-specific preprocessing
+        X = self._preprocess_features(X)
 
         # Convert to numpy and scale
         X = np.array(X)
@@ -140,12 +198,33 @@ class SklearnTorchWrapper(BaseEstimator, RegressorMixin):
         # Inverse transform predictions
         predictions = self.scaler_y_.inverse_transform(predictions.reshape(-1, 1)).ravel()
 
+        # Apply project-specific postprocessing
+        predictions = self._postprocess_predictions(predictions)
+
         return predictions
 
 
 class HybridLSTM(SklearnTorchWrapper):
     """
-    Hybrid LSTM model with sklearn preprocessing.
+    Base Hybrid LSTM model with sklearn preprocessing.
+
+    This is a BASE CLASS for project-specific LSTM implementations.
+
+    Project-specific inheritance examples:
+        class WalmartHybridLSTM(HybridLSTM):
+            def __init__(self, **kwargs):
+                # Walmart-optimized parameters
+                super().__init__(hidden_size=128, num_layers=3, dropout=0.2, **kwargs)
+
+            def fit(self, X, y):
+                # Add Walmart-specific feature engineering
+                X_processed = self._add_holiday_features(X)
+                return super().fit(X_processed, y)
+
+        class OlaHybridLSTM(HybridLSTM):
+            def __init__(self, **kwargs):
+                # Rideshare-optimized parameters
+                super().__init__(hidden_size=64, num_layers=2, dropout=0.1, **kwargs)
     """
 
     def __init__(self, hidden_size: int = 64, num_layers: int = 1, dropout: float = 0.0, **kwargs):
@@ -159,7 +238,7 @@ class HybridLSTM(SklearnTorchWrapper):
             **kwargs: Additional arguments for wrapper
         """
         try:
-            from ..models.lstm import LSTMForecaster
+            from ..models.deep_learning.lstm import LSTMForecaster
 
             model_class = LSTMForecaster
         except ImportError:
@@ -173,7 +252,24 @@ class HybridLSTM(SklearnTorchWrapper):
 
 class HybridTransformer(SklearnTorchWrapper):
     """
-    Hybrid Transformer model with sklearn preprocessing.
+    Base Hybrid Transformer model with sklearn preprocessing.
+
+    This is a BASE CLASS for project-specific Transformer implementations.
+
+    Project-specific inheritance examples:
+        class InventoryHybridTransformer(HybridTransformer):
+            def __init__(self, **kwargs):
+                # Inventory-optimized parameters for longer sequences
+                super().__init__(d_model=128, nhead=8, num_layers=4, **kwargs)
+
+            def _add_inventory_features(self, X):
+                # Add inventory-specific features (lead times, reorder points)
+                return X
+
+        class TSIHybridTransformer(HybridTransformer):
+            def __init__(self, **kwargs):
+                # Economic indicators optimized parameters
+                super().__init__(d_model=64, nhead=4, num_layers=2, **kwargs)
     """
 
     def __init__(self, d_model: int = 64, nhead: int = 8, num_layers: int = 2, dropout: float = 0.1, **kwargs):
@@ -188,7 +284,7 @@ class HybridTransformer(SklearnTorchWrapper):
             **kwargs: Additional arguments for wrapper
         """
         try:
-            from ..models.transformer import TransformerForecaster
+            from ..models.deep_learning.transformer import TransformerForecaster
 
             model_class = TransformerForecaster
         except ImportError:
@@ -248,7 +344,32 @@ def create_hybrid_pipeline(
 
 class EnsembleHybrid(BaseEstimator, RegressorMixin):
     """
-    Ensemble of hybrid models with different architectures.
+    Base ensemble of hybrid models with different architectures.
+
+    This is a BASE CLASS for project-specific ensemble implementations.
+
+    Project-specific inheritance examples:
+        class WalmartEnsemble(EnsembleHybrid):
+            def __init__(self):
+                # Walmart-specific ensemble configuration
+                models = [
+                    {'type': 'lstm', 'model_params': {'hidden_size': 128}},
+                    {'type': 'transformer', 'model_params': {'d_model': 64}},
+                ]
+                super().__init__(models=models, weights=[0.6, 0.4])
+
+            def _get_walmart_models(self):
+                # Return domain-specific model configurations
+                pass
+
+        class OlaEnsemble(EnsembleHybrid):
+            def __init__(self):
+                # Rideshare-specific ensemble for demand prediction
+                models = [
+                    {'type': 'lstm', 'model_params': {'hidden_size': 64}},
+                    {'type': 'transformer', 'model_params': {'d_model': 32}},
+                ]
+                super().__init__(models=models)
     """
 
     def __init__(self, models: List[Dict[str, Any]], weights: Optional[List[float]] = None):
@@ -351,3 +472,92 @@ def create_ensemble_config(
         configs.append(config)
 
     return configs
+
+
+# Factory Functions for Project-Specific Class Creation
+
+
+def create_project_hybrid_class(project_name: str, model_type: str, base_class=None):
+    """
+    Factory function to create project-specific hybrid classes following naming conventions.
+
+    This function creates classes that follow the pattern: {ProjectName}Hybrid{ModelType}
+
+    Args:
+        project_name: Name of the project (e.g., "Walmart", "Ola", "Inventory", "TSI")
+        model_type: Type of model (e.g., "LSTM", "Transformer")
+        base_class: Base class to inherit from (auto-detected if None)
+
+    Returns:
+        Project-specific hybrid class
+
+    Example:
+        WalmartHybridLSTM = create_project_hybrid_class("Walmart", "LSTM")
+        OlaHybridTransformer = create_project_hybrid_class("Ola", "Transformer")
+    """
+    if base_class is None:
+        if model_type.upper() == "LSTM":
+            base_class = HybridLSTM
+        elif model_type.upper() == "TRANSFORMER":
+            base_class = HybridTransformer
+        else:
+            base_class = SklearnTorchWrapper
+
+    class_name = f"{project_name}Hybrid{model_type}"
+
+    class ProjectHybridClass(base_class):
+        """Dynamically created project-specific hybrid class."""
+
+        def __init__(self, **kwargs):
+            # Project-specific default parameters can be set here
+            super().__init__(**kwargs)
+            self.project_name = project_name
+            self.model_type = model_type
+
+        def __repr__(self):
+            return f"{class_name}(project={self.project_name}, model={self.model_type})"
+
+    ProjectHybridClass.__name__ = class_name
+    ProjectHybridClass.__qualname__ = class_name
+
+    return ProjectHybridClass
+
+
+def get_project_specific_params(project_name: str, model_type: str) -> Dict[str, Any]:
+    """
+    Get recommended parameters for project-specific hybrid models.
+
+    Args:
+        project_name: Project name
+        model_type: Model type
+
+    Returns:
+        Dictionary of recommended parameters
+    """
+    params = {}
+
+    if project_name.lower() == "walmart":
+        if model_type.upper() == "LSTM":
+            params = {"hidden_size": 128, "num_layers": 3, "dropout": 0.2}
+        elif model_type.upper() == "TRANSFORMER":
+            params = {"d_model": 64, "nhead": 8, "num_layers": 2}
+
+    elif project_name.lower() == "ola" or project_name.lower() == "rideshare":
+        if model_type.upper() == "LSTM":
+            params = {"hidden_size": 64, "num_layers": 2, "dropout": 0.1}
+        elif model_type.upper() == "TRANSFORMER":
+            params = {"d_model": 32, "nhead": 4, "num_layers": 2}
+
+    elif project_name.lower() == "inventory":
+        if model_type.upper() == "LSTM":
+            params = {"hidden_size": 96, "num_layers": 2, "dropout": 0.15}
+        elif model_type.upper() == "TRANSFORMER":
+            params = {"d_model": 128, "nhead": 8, "num_layers": 4}
+
+    elif project_name.lower() == "tsi" or project_name.lower() == "transportation":
+        if model_type.upper() == "LSTM":
+            params = {"hidden_size": 64, "num_layers": 2, "dropout": 0.1}
+        elif model_type.upper() == "TRANSFORMER":
+            params = {"d_model": 64, "nhead": 4, "num_layers": 2}
+
+    return params

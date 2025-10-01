@@ -7,15 +7,9 @@ quantile losses, pinball loss, and SMAPE.
 
 import numpy as np
 from typing import Optional
-
-try:
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
-
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 
 def mse_loss(y_true, y_pred):
@@ -29,7 +23,7 @@ def mse_loss(y_true, y_pred):
     Returns:
         MSE loss
     """
-    if TORCH_AVAILABLE and torch.is_tensor(y_true):
+    if torch.is_tensor(y_true):
         return F.mse_loss(y_pred, y_true)
     else:
         return np.mean((y_true - y_pred) ** 2)
@@ -46,7 +40,7 @@ def mae_loss(y_true, y_pred):
     Returns:
         MAE loss
     """
-    if TORCH_AVAILABLE and torch.is_tensor(y_true):
+    if torch.is_tensor(y_true):
         return F.l1_loss(y_pred, y_true)
     else:
         return np.mean(np.abs(y_true - y_pred))
@@ -64,7 +58,7 @@ def smape_loss(y_true, y_pred, epsilon=1e-8):
     Returns:
         SMAPE loss
     """
-    if TORCH_AVAILABLE and torch.is_tensor(y_true):
+    if torch.is_tensor(y_true):
         numerator = torch.abs(y_true - y_pred)
         denominator = (torch.abs(y_true) + torch.abs(y_pred)) / 2 + epsilon
         return torch.mean(numerator / denominator) * 100
@@ -86,7 +80,7 @@ def quantile_loss(y_true, y_pred, quantile=0.5):
     Returns:
         Quantile loss
     """
-    if TORCH_AVAILABLE and torch.is_tensor(y_true):
+    if torch.is_tensor(y_true):
         errors = y_true - y_pred
         loss = torch.max(quantile * errors, (quantile - 1) * errors)
         return torch.mean(loss)
@@ -123,7 +117,7 @@ def huber_loss(y_true, y_pred, delta=1.0):
     Returns:
         Huber loss
     """
-    if TORCH_AVAILABLE and torch.is_tensor(y_true):
+    if torch.is_tensor(y_true):
         return F.huber_loss(y_pred, y_true, delta=delta)
     else:
         error = y_true - y_pred
@@ -133,7 +127,7 @@ def huber_loss(y_true, y_pred, delta=1.0):
         return np.mean(np.where(is_small_error, squared_loss, linear_loss))
 
 
-if TORCH_AVAILABLE:
+class QuantileLoss(nn.Module):
 
     class QuantileLoss(nn.Module):
         """
@@ -207,17 +201,3 @@ if TORCH_AVAILABLE:
                 total_loss += loss_q
 
             return total_loss / len(self.quantiles)
-
-else:
-    # Placeholder classes when PyTorch is not available
-    class QuantileLoss:
-        def __init__(self, *args, **kwargs):
-            raise ImportError("PyTorch is required for QuantileLoss")
-
-    class SMAPELoss:
-        def __init__(self, *args, **kwargs):
-            raise ImportError("PyTorch is required for SMAPELoss")
-
-    class MultiQuantileLoss:
-        def __init__(self, *args, **kwargs):
-            raise ImportError("PyTorch is required for MultiQuantileLoss")

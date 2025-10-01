@@ -11,15 +11,16 @@ import random
 
 class DataLoader:
     """Simple DataLoader implementation without PyTorch dependency."""
-    
-    def __init__(self, dataset, batch_size: int = 1, shuffle: bool = False, 
-                 sampler=None, drop_last: bool = False, **kwargs):
+
+    def __init__(
+        self, dataset, batch_size: int = 1, shuffle: bool = False, sampler=None, drop_last: bool = False, **kwargs
+    ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.sampler = sampler
         self.drop_last = drop_last
-    
+
     def __iter__(self):
         if self.sampler:
             indices = list(self.sampler)
@@ -28,25 +29,25 @@ class DataLoader:
             random.shuffle(indices)
         else:
             indices = list(range(len(self.dataset)))
-        
+
         # Create batches
         for i in range(0, len(indices), self.batch_size):
-            batch_indices = indices[i:i + self.batch_size]
-            
+            batch_indices = indices[i : i + self.batch_size]
+
             # Skip incomplete batch if drop_last=True
             if self.drop_last and len(batch_indices) < self.batch_size:
                 continue
-                
+
             batch_data = []
             batch_targets = []
-            
+
             for idx in batch_indices:
                 data, target = self.dataset[idx]
                 batch_data.append(data)
                 batch_targets.append(target)
-            
+
             yield batch_data, batch_targets
-    
+
     def __len__(self):
         if self.drop_last:
             return len(self.dataset) // self.batch_size
@@ -56,13 +57,13 @@ class DataLoader:
 
 class Sampler:
     """Base sampler class without PyTorch dependency."""
-    
+
     def __init__(self, data_source=None):
         self.data_source = data_source
-    
+
     def __iter__(self):
         raise NotImplementedError
-    
+
     def __len__(self):
         raise NotImplementedError
 
@@ -137,9 +138,6 @@ def create_time_series_dataloader(
     Returns:
         Configured PyTorch DataLoader
     """
-    if not TORCH_AVAILABLE:
-        raise ImportError("PyTorch is required for DataLoader functionality")
-
     # Use custom sampler if shuffle is requested with block size
     if shuffle and block_shuffle_size:
         sampler = TimeSeriesSampler(dataset_size=len(dataset), shuffle=True, block_size=block_shuffle_size)

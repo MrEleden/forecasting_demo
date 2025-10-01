@@ -300,6 +300,16 @@ poetry cache clear pypi --all    # Clear package cache
 - **Time Series Metrics**: MAPE, SMAPE, directional accuracy with temporal cross-validation
 - **Consistent Naming**: All models use same config keys across projects (model=lstm, model=arima)
 
+## Project-Specific Class Inheritance Pattern
+- **Inherit from Shared Library**: Project-specific classes MUST inherit from base classes in `src/ml_portfolio/`
+- **Extend, Don't Duplicate**: Override methods only when domain-specific customization is needed
+- **Maintain Compatibility**: Ensure project classes remain compatible with Hydra `_target_` instantiation
+- **Domain Specialization**: Add project-specific features (custom metrics, data transforms, model variants)
+- **Example Pattern**: `WalmartARIMAModel(ARIMAWrapper)` with Walmart-specific preprocessing
+- **Configuration Integration**: Project classes should accept same config structure as base classes
+- **Naming Convention**: Use `{ProjectName}{ModelType}` naming (e.g., `OlaDemandLSTM`, `InventoryProphet`)
+- **Import Strategy**: Always import from shared library, extend locally for project needs
+
 ## Key Development Commands
 ```bash
 # Environment setup
