@@ -4,28 +4,22 @@ Train ARIMA model on Walmart dataset using Hydra configuration.
 
 import os
 import sys
+import warnings
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
-from pathlib import Path
-import warnings
+
+# Hydra imports
+import hydra
+from hydra.utils import instantiate
+from omegaconf import DictConfig, OmegaConf
 
 warnings.filterwarnings("ignore")
 
 # Add src to Python path for imports
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
-
-try:
-    import hydra
-    from hydra import compose, initialize_config_dir
-    from hydra.core.global_hydra import GlobalHydra
-    from hydra.utils import instantiate
-    from omegaconf import DictConfig, OmegaConf
-
-    HYDRA_AVAILABLE = True
-except ImportError:
-    print("Hydra not available, using basic configuration")
-    HYDRA_AVAILABLE = False
 
 from ml_portfolio.models.statistical.statistical import ARIMAWrapper
 from ml_portfolio.models.metrics import rmse, mae, mape
@@ -143,28 +137,16 @@ def train_arima_model(train_data: pd.Series, config: DictConfig):
     print(f"  Trend: {config.trend}")
 
     # Instantiate model using Hydra
-    if HYDRA_AVAILABLE:
-        # Only instantiate the model part, not the entire config
-        model_config = {
-            "_target_": "ml_portfolio.models.statistical.ARIMAWrapper",
-            "order": config.order,
-            "seasonal_order": config.seasonal_order,
-            "trend": config.trend,
-            "enforce_stationarity": config.enforce_stationarity,
-            "enforce_invertibility": config.enforce_invertibility,
-            "concentrate_scale": config.concentrate_scale,
-        }
-        model = instantiate(model_config)
-    else:
-        # Fallback instantiation
-        model = ARIMAWrapper(
-            order=tuple(config.order),
-            seasonal_order=tuple(config.seasonal_order),
-            trend=config.trend,
-            enforce_stationarity=config.enforce_stationarity,
-            enforce_invertibility=config.enforce_invertibility,
-            concentrate_scale=config.concentrate_scale,
-        )
+    model_config = {
+        "_target_": "ml_portfolio.models.statistical.ARIMAWrapper",
+        "order": config.order,
+        "seasonal_order": config.seasonal_order,
+        "trend": config.trend,
+        "enforce_stationarity": config.enforce_stationarity,
+        "enforce_invertibility": config.enforce_invertibility,
+        "concentrate_scale": config.concentrate_scale,
+    }
+    model = instantiate(model_config)
 
     # Fit the model
     print("Fitting ARIMA model...")
@@ -254,8 +236,7 @@ def save_results(model, results: dict, config: DictConfig):
     ensure_dir(output_dir)
 
     # Save configuration
-    if HYDRA_AVAILABLE:
-        OmegaConf.save(config, output_dir / "config.yaml")
+    OmegaConf.save(config, output_dir / "config.yaml")
 
     # Save results
     results_df = pd.DataFrame(
@@ -296,10 +277,7 @@ def main(config: DictConfig) -> None:
     print("Walmart ARIMA Forecasting with Hydra")
     print("=" * 50)
     print(f"Configuration:")
-    if HYDRA_AVAILABLE:
-        print(OmegaConf.to_yaml(config))
-    else:
-        print(config)
+    print(OmegaConf.to_yaml(config))
 
     try:
         # Load data
@@ -327,44 +305,5 @@ def main(config: DictConfig) -> None:
         raise
 
 
-def main_fallback():
-    """
-    Fallback main function when Hydra is not available.
-    """
-    print("Running without Hydra (fallback mode)")
-
-    # Create simple config
-    from types import SimpleNamespace
-
-    config = SimpleNamespace()
-    config.dataset = SimpleNamespace()
-    config.dataset.file_path = "data/raw/Walmart.csv"
-    config.dataset.date_column = "Date"
-    config.dataset.target_column = "Weekly_Sales"
-    config.dataset.store_column = "Store"
-    config.dataset.dept_column = "Dept"
-    config.dataset.train_size = 0.8
-    config.dataset.validation_size = 0.1
-    config.dataset.test_size = 0.1
-    config.dataset.fillna_method = "forward"
-    config.dataset.log_transform = False
-    config.dataset.aggregate_by = None
-
-    config.order = [1, 1, 1]
-    config.seasonal_order = [0, 0, 0, 0]
-    config.trend = None
-    config.enforce_stationarity = True
-    config.enforce_invertibility = True
-    config.concentrate_scale = False
-
-    config.experiment = SimpleNamespace()
-    config.experiment.name = "arima_walmart_fallback"
-
-    main(config)
-
-
 if __name__ == "__main__":
-    if HYDRA_AVAILABLE:
-        main()
-    else:
-        main_fallback()
+    main()
