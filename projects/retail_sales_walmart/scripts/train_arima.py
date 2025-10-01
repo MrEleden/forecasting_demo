@@ -27,7 +27,7 @@ except ImportError:
     print("Hydra not available, using basic configuration")
     HYDRA_AVAILABLE = False
 
-from ml_portfolio.models.statistical import ARIMAWrapper
+from ml_portfolio.models.statistical.statistical import ARIMAWrapper
 from ml_portfolio.models.metrics import rmse, mae, mape
 from ml_portfolio.utils.io import ensure_dir
 

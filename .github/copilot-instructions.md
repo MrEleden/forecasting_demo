@@ -34,13 +34,15 @@ ml-portfolio/
 │       │   ├── transforms.py     # Scalers, encoders, feature engineering
 │       │   └── timeseries.py     # Windowing, lags, calendar features
 │       ├── models/
-│       │   ├── blocks/           # Reusable layers (TCN, attention mechanisms)
-│       │   ├── losses.py         # MSE/MAE/Quantile/Pinball/SMAPE for forecasting
-│       │   ├── metrics.py        # RMSE/MAE/MAPE + time series CV helpers
-│       │   ├── forecasting/
+│       │   ├── statistical/      # Traditional statistical forecasting models
+│       │   │   └── statistical.py# ARIMA, Prophet, Exponential Smoothing
+│       │   ├── deep_learning/    # Neural network-based forecasting models
 │       │   │   ├── lstm.py       # LSTM/Seq2Seq implementations
 │       │   │   ├── transformer.py# Informer/Transformer for long sequences
 │       │   │   └── tcn.py        # Temporal ConvNet
+│       │   ├── blocks/           # Reusable layers (TCN, attention mechanisms)
+│       │   ├── losses.py         # MSE/MAE/Quantile/Pinball/SMAPE for forecasting
+│       │   ├── metrics.py        # RMSE/MAE/MAPE + time series CV helpers
 │       │   ├── wrappers.py       # Scikit-learn compatible interfaces
 │       │   └── registry.py       # Model registry for loading/comparing models
 │       ├── training/
