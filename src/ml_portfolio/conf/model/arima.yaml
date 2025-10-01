@@ -1,0 +1,13 @@
+# ARIMA model configuration (statsmodels)
+# Use with SimpleDataLoader and max_epochs=1
+
+_target_: ml_portfolio.models.statistical.statistical.ARIMAWrapper
+
+# ARIMA parameters
+order: [1, 1, 1]  # (p, d, q) - autoregressive, differencing, moving average
+seasonal_order: [0, 0, 0, 0]  # (P, D, Q, s) - seasonal components
+
+# Fitting parameters
+method: lbfgs  # Optimization method
+maxiter: 50
+suppress_warnings: true

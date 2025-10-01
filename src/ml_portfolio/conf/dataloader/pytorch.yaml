@@ -1,0 +1,13 @@
+# PyTorchDataLoader configuration
+# Mini-batch iteration with PyTorch's native DataLoader
+# Perfect for deep learning models (LSTM, Transformer, etc.)
+
+_target_: ml_portfolio.data.loaders.PyTorchDataLoader
+batch_size: 64
+shuffle: true
+num_workers: 0  # Set to 2-4 for multi-process loading (requires PyTorch)
+pin_memory: false  # Set true for GPU training
+drop_last: false  # Whether to drop last incomplete batch
+
+# This loader yields multiple batches of size batch_size
+# Use with max_epochs > 1 for iterative training

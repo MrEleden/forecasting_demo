@@ -1,0 +1,40 @@
+# Main configuration file for ML Portfolio training
+# This serves as the base configuration for all training runs
+
+defaults:
+  - dataloader: simple  # simple or pytorch
+  - dataset: default
+  - model: random_forest  # Statistical or ML models
+  - optimizer: null  # For deep learning models (adam, adamw, sgd)
+  - scheduler: null  # LR scheduler for deep learning (step_lr, cosine, plateau)
+  - metrics: default
+  - _self_
+
+# Optimizer and scheduler are optional (only for PyTorch models)
+# For sklearn models: set to null
+# For PyTorch models: specify optimizer=adam scheduler=step_lr
+
+# Training configuration
+training:
+  max_epochs: 1  # 1 for sklearn, >1 for PyTorch
+  early_stopping: false  # Enable for iterative training
+  patience: 10
+  min_delta: 0.0001
+  monitor_metric: val_loss
+  verbose: true
+  random_seed: 42
+
+# Logging and output
+logging:
+  log_dir: outputs
+  experiment_name: experiment
+  save_checkpoints: true
+  checkpoint_dir: models/checkpoints
+
+# Hydra configuration
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}

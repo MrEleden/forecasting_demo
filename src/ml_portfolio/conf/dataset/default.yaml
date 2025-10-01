@@ -1,0 +1,22 @@
+# Default dataset configuration
+# Override these values in project-specific configs
+
+_target_: ml_portfolio.data.datasets.TimeSeriesDataset
+
+# Data paths (relative to project root)
+data_path: data/processed/train.parquet
+features: null  # List of feature columns, null = all except target
+target: target  # Target column name
+
+# Time series parameters
+lookback_window: 24  # Number of past timesteps to use
+forecast_horizon: 1  # Number of future timesteps to predict
+
+# Preprocessing
+scaling: standard  # standard, minmax, robust, or null
+handle_missing: ffill  # ffill, bfill, drop, or null
+
+# Data split
+train_size: 0.7
+val_size: 0.15
+test_size: 0.15

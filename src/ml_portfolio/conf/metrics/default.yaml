@@ -1,0 +1,21 @@
+# Default metrics configuration
+# Metrics to compute during training and evaluation
+
+# Regression metrics (for forecasting)
+metrics:
+  - _target_: sklearn.metrics.mean_squared_error
+    name: mse
+    squared: true
+  
+  - _target_: sklearn.metrics.mean_absolute_error
+    name: mae
+  
+  - _target_: sklearn.metrics.mean_absolute_percentage_error
+    name: mape
+  
+  - _target_: sklearn.metrics.r2_score
+    name: r2
+
+# Primary metric for early stopping
+primary_metric: mse
+minimize: true  # true for loss metrics, false for accuracy metrics

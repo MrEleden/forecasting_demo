@@ -1,0 +1,10 @@
+# AdamW optimizer configuration (PyTorch)
+# Adam with decoupled weight decay - better for transformers
+
+_target_: torch.optim.AdamW
+
+lr: 0.001  # Learning rate
+betas: [0.9, 0.999]
+eps: 1.0e-08
+weight_decay: 0.01  # Decoupled weight decay
+amsgrad: false

@@ -1,0 +1,10 @@
+# Adam optimizer configuration (PyTorch)
+# Use with deep learning models (LSTM, Transformer, etc.)
+
+_target_: torch.optim.Adam
+
+lr: 0.001  # Learning rate
+betas: [0.9, 0.999]  # Coefficients for computing running averages
+eps: 1.0e-08  # Term added for numerical stability
+weight_decay: 0.0  # L2 regularization
+amsgrad: false

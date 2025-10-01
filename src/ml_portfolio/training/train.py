@@ -91,9 +91,10 @@ def main(cfg: DictConfig) -> float:
     # ========================================================================
     # 2. Instantiate data loaders from configuration
     # ========================================================================
-    # Get dataloader config (will be used by engine to create loaders)
-    dataloader_config = OmegaConf.to_container(cfg.dataloader, resolve=True) if hasattr(cfg, "dataloader") else {}
-    logger.info(f"DataLoader config: {dataloader_config.get('_target_', 'default')}")
+    # Get dataloader config (optional)
+    dataloader_train = hydra.utils.instantiate(cfg.dataloader, dataset=train_dataset)
+    dataloader_val = hydra.utils.instantiate(cfg.dataloader, dataset=val_dataset)
+    dataloader_test = hydra.utils.instantiate(cfg.dataloader, dataset=test_dataset)
     # ========================================================================
     # 3. Instantiate model from configuration
     # ========================================================================
@@ -102,7 +103,35 @@ def main(cfg: DictConfig) -> float:
     logger.info(f"Model created: {model.__class__.__name__}")
 
     # ========================================================================
-    # 3. Instantiate metrics from configuration
+    # 4. Instantiate optimizer (for PyTorch models)
+    # ========================================================================
+    optimizer = None
+    if hasattr(cfg, "optimizer") and cfg.optimizer is not None:
+        try:
+            # For PyTorch models, optimizer needs model parameters
+            if hasattr(model, "parameters"):
+                logger.info(f"Instantiating optimizer: {cfg.optimizer._target_}")
+                optimizer = hydra.utils.instantiate(cfg.optimizer, params=model.parameters())
+                logger.info(f"Optimizer created: {optimizer.__class__.__name__}")
+            else:
+                logger.info("Model does not have parameters() - skipping optimizer (sklearn model)")
+        except Exception as e:
+            logger.warning(f"Failed to instantiate optimizer: {e}")
+
+    # ========================================================================
+    # 5. Instantiate scheduler (for PyTorch models)
+    # ========================================================================
+    scheduler = None
+    if hasattr(cfg, "scheduler") and cfg.scheduler is not None and optimizer is not None:
+        try:
+            logger.info(f"Instantiating scheduler: {cfg.scheduler._target_}")
+            scheduler = hydra.utils.instantiate(cfg.scheduler, optimizer=optimizer)
+            logger.info(f"Scheduler created: {scheduler.__class__.__name__}")
+        except Exception as e:
+            logger.warning(f"Failed to instantiate scheduler: {e}")
+
+    # ========================================================================
+    # 6. Instantiate metrics from configuration
     # ========================================================================
     logger.info("Instantiating metrics...")
     metrics = {}
@@ -114,7 +143,7 @@ def main(cfg: DictConfig) -> float:
             logger.warning(f"  - Failed to instantiate {metric_name}: {e}")
 
     # ========================================================================
-    # 4. Create training engine with data loader
+    # 7. Create training engine with all components
     # ========================================================================
     logger.info("Creating TrainingEngine with datasets...")
     engine = TrainingEngine(
@@ -123,10 +152,13 @@ def main(cfg: DictConfig) -> float:
         train_dataset=dataloader_train,
         val_dataset=dataloader_val,
         test_dataset=dataloader_test,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        config=cfg.training if hasattr(cfg, "training") else {},
     )
 
     # ========================================================================
-    # 5. Train model using training engine and validation data for parameter tuning
+    # 8. Train model using training engine and validation data for parameter tuning
     # ========================================================================
     logger.info("Starting training...")
     results = engine.train()
@@ -138,7 +170,7 @@ def main(cfg: DictConfig) -> float:
     logger.info(f"  Converged: {results['converged']}")
 
     # ========================================================================
-    # 6. Evaluate on test set (engine handles internally)
+    # 9. Evaluate on test set (engine handles internally)
     # ========================================================================
     logger.info("Evaluating on test set...")
     test_metrics = engine.evaluate_test()

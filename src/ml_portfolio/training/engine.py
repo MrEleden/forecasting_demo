@@ -48,6 +48,8 @@ class TrainingEngine:
         train_dataset=None,
         val_dataset=None,
         test_dataset=None,
+        optimizer=None,
+        scheduler=None,
         config: Optional[Dict[str, Any]] = None,
     ):
         """
@@ -59,6 +61,8 @@ class TrainingEngine:
             train_dataset: Training dataloader (iterator yielding batches)
             val_dataset: Validation dataloader (iterator yielding batches)
             test_dataset: Test dataloader (iterator yielding batches)
+            optimizer: PyTorch optimizer (optional, for deep learning models)
+            scheduler: Learning rate scheduler (optional, for deep learning models)
             config: Training configuration (optional)
         """
         self.model = model
@@ -66,6 +70,8 @@ class TrainingEngine:
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.test_dataset = test_dataset
+        self.optimizer = optimizer
+        self.scheduler = scheduler
         self.config = config or {}
 
         # Training parameters
@@ -164,6 +170,21 @@ class TrainingEngine:
 
             if self.verbose:
                 self._log_metrics(epoch, train_metrics, val_metrics, epoch_time)
+
+            # Learning rate scheduler step (for PyTorch models)
+            if self.scheduler is not None:
+                # Check if scheduler needs metric (ReduceLROnPlateau)
+                if hasattr(self.scheduler, "step") and "metrics" in self.scheduler.step.__code__.co_varnames:
+                    # ReduceLROnPlateau needs validation metric
+                    current_metric = val_metrics.get(self.monitor_metric, float("inf"))
+                    self.scheduler.step(current_metric)
+                else:
+                    # Regular schedulers (StepLR, CosineAnnealingLR, etc.)
+                    self.scheduler.step()
+
+                if self.verbose and hasattr(self.optimizer, "param_groups"):
+                    current_lr = self.optimizer.param_groups[0]["lr"]
+                    logger.info(f"Learning rate: {current_lr:.6f}")
 
             # Early stopping check
             if self.early_stopping and self.val_dataset is not None:

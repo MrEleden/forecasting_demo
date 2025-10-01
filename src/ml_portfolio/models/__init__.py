@@ -1,26 +1,20 @@
 """
-Models module for ML Portfolio
+Models module for ML Portfolio.
 
-Contains forecasting models, loss functions, metrics, and model management utilities.
+Contains model implementations and registry for managing trained models.
+
+Usage:
+    from ml_portfolio.models.registry import ModelRegistry
+    from ml_portfolio.models.statistical.statistical import ARIMAWrapper
+    from ml_portfolio.models.deep_learning.lstm import LSTMForecaster
 """
 
-from .losses import *
-from .metrics import *
-from .wrappers import *
-from .registry import *
-
-# Try to import statistical models (optional dependencies)
-try:
-    from .statistical import *
-
-    STATISTICAL_AVAILABLE = True
-except ImportError:
-    STATISTICAL_AVAILABLE = False
-
-# Try to import deep learning models (optional PyTorch dependency)
-try:
-    from .deep_learning import *
-
-    PYTORCH_AVAILABLE = True
-except ImportError:
-    PYTORCH_AVAILABLE = False
+__all__ = [
+    "statistical",
+    "deep_learning",
+    "blocks",
+    "losses",
+    "metrics",
+    "wrappers",
+    "registry",
+]

@@ -1,0 +1,18 @@
+# LSTM model configuration (PyTorch)
+# Use with PyTorchDataLoader and max_epochs>1
+
+_target_: ml_portfolio.models.deep_learning.lstm.LSTMForecaster
+
+# Architecture
+input_size: 10  # Number of features
+hidden_size: 128
+num_layers: 2
+dropout: 0.2
+bidirectional: false
+
+# Output
+output_size: 1  # Forecast horizon
+forecast_horizon: 1
+
+# Training
+learning_rate: 0.001
