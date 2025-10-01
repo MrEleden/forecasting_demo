@@ -1,228 +1,250 @@
 """
-DataLoader factories with time series sampling strategies.
+DataLoader implementations for time series forecasting.
 
-This module provides utilities for creating DataLoaders optimized for
-time series forecasting tasks with proper PyTorch integration.
+This module provides a unified interface for batch data loading with both
+PyTorch and non-PyTorch implementations.
+
+Architecture:
+- BaseDataLoader: Master abstract class defining the interface
+- PyTorchDataLoader: PyTorch-based implementation (when torch available)
+- SimpleDataLoader: NumPy-based implementation (no dependencies)
 """
 
-from typing import Optional, Union, Iterator, List
-import random
+from typing import Optional, Iterator, Tuple
+from abc import ABC, abstractmethod
+import numpy as np
 
 
-class DataLoader:
-    """Simple DataLoader implementation without PyTorch dependency."""
+class BaseDataLoader(ABC):
+    """
+    Master abstract class for all DataLoader implementations.
 
-    def __init__(
-        self, dataset, batch_size: int = 1, shuffle: bool = False, sampler=None, drop_last: bool = False, **kwargs
-    ):
+    Defines the standard interface that all loaders must implement.
+    Can be instantiated via Hydra with _target_ pointing to specific implementations.
+
+    Usage with Hydra:
+        # In config.yaml
+        dataloader:
+            _target_: ml_portfolio.data.loaders.SimpleDataLoader
+            batch_size: 32
+            shuffle: true
+    """
+
+    def __init__(self, dataset, batch_size: int = 32, shuffle: bool = False, **kwargs):
+        """
+        Initialize base dataloader.
+
+        Args:
+            dataset: Dataset with __len__ and __getitem__ methods
+            batch_size: Number of samples per batch
+            shuffle: Whether to shuffle data
+            **kwargs: Additional parameters for specific implementations
+        """
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.sampler = sampler
-        self.drop_last = drop_last
+        self.kwargs = kwargs
 
-    def __iter__(self):
-        if self.sampler:
-            indices = list(self.sampler)
-        elif self.shuffle:
-            indices = list(range(len(self.dataset)))
-            random.shuffle(indices)
-        else:
-            indices = list(range(len(self.dataset)))
-
-        # Create batches
-        for i in range(0, len(indices), self.batch_size):
-            batch_indices = indices[i : i + self.batch_size]
-
-            # Skip incomplete batch if drop_last=True
-            if self.drop_last and len(batch_indices) < self.batch_size:
-                continue
-
-            batch_data = []
-            batch_targets = []
-
-            for idx in batch_indices:
-                data, target = self.dataset[idx]
-                batch_data.append(data)
-                batch_targets.append(target)
-
-            yield batch_data, batch_targets
-
-    def __len__(self):
-        if self.drop_last:
-            return len(self.dataset) // self.batch_size
-        else:
-            return (len(self.dataset) + self.batch_size - 1) // self.batch_size
-
-
-class Sampler:
-    """Base sampler class without PyTorch dependency."""
-
-    def __init__(self, data_source=None):
-        self.data_source = data_source
-
-    def __iter__(self):
-        raise NotImplementedError
-
-    def __len__(self):
-        raise NotImplementedError
-
-
-class TimeSeriesSampler(Sampler):
-    """
-    Custom sampler for time series data that respects temporal order.
-    Inherits from torch.utils.data.Sampler for full PyTorch compatibility.
-    """
-
-    def __init__(self, dataset_size: int, shuffle: bool = False, block_size: Optional[int] = None):
+    @abstractmethod
+    def __iter__(self) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
         """
-        Initialize TimeSeriesSampler.
+        Iterate over batches.
+
+        Yields:
+            Tuple of (X_batch, y_batch) as numpy arrays
+        """
+        pass
+
+    @abstractmethod
+    def __len__(self) -> int:
+        """
+        Return number of batches.
+
+        Returns:
+            Number of batches in the dataset
+        """
+        pass
+
+
+class SimpleDataLoader(BaseDataLoader):
+    """
+    Simple NumPy-based DataLoader for sklearn-style models.
+
+    This loader returns ALL data in a single batch (infinite batch size).
+    Perfect for sklearn models that expect fit(X, y) with complete dataset.
+
+    Features:
+    - No dependencies (pure NumPy)
+    - Single batch = entire dataset
+    - Optional shuffling of indices
+    - Always works, no special requirements
+
+    Usage:
+        loader = SimpleDataLoader(dataset, shuffle=True)
+        for X_batch, y_batch in loader:
+            # X_batch and y_batch contain ALL data as numpy arrays
+            model.fit(X_batch, y_batch)
+
+    Hydra Config:
+        dataloader:
+            _target_: ml_portfolio.data.loaders.SimpleDataLoader
+            shuffle: true
+    """
+
+    def __init__(
+        self,
+        dataset,
+        batch_size: Optional[int] = None,  # Ignored, always uses full dataset
+        shuffle: bool = False,
+        **kwargs,
+    ):
+        """
+        Initialize SimpleDataLoader.
 
         Args:
-            dataset_size: Size of the dataset
-            shuffle: Whether to shuffle the data (usually False for time series)
-            block_size: Size of blocks for block-wise shuffling (preserves local order)
+            dataset: Dataset with __len__ and __getitem__
+            batch_size: Ignored (always returns full dataset)
+            shuffle: Whether to shuffle indices before creating batch
+            **kwargs: Ignored (for compatibility)
         """
-        super().__init__(None)  # Pass None as data_source since we handle indices manually
-        self.dataset_size = dataset_size
-        self.shuffle = shuffle
-        self.block_size = block_size
+        super().__init__(dataset, batch_size=len(dataset), shuffle=shuffle, **kwargs)
+        self.n_samples = len(dataset)
 
-    def __iter__(self) -> Iterator[int]:
-        """Iterate over indices maintaining temporal relationships."""
+    def __iter__(self) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+        """
+        Iterate over single batch (all data).
+
+        Yields:
+            Tuple of (X_batch, y_batch) containing entire dataset as numpy arrays
+        """
+        indices = np.arange(self.n_samples)
+
         if self.shuffle:
-            if self.block_size:
-                # Block-wise shuffling: shuffle blocks but maintain order within blocks
-                indices = list(range(self.dataset_size))
-                blocks = [indices[i : i + self.block_size] for i in range(0, len(indices), self.block_size)]
-                random.shuffle(blocks)
-                shuffled_indices = [idx for block in blocks for idx in block]
-                return iter(shuffled_indices)
-            else:
-                # Regular shuffling (not recommended for time series)
-                indices = list(range(self.dataset_size))
-                random.shuffle(indices)
-                return iter(indices)
-        else:
-            # Sequential order (recommended for time series)
-            return iter(range(self.dataset_size))
+            np.random.shuffle(indices)
+
+        # Collect all samples
+        X_list = []
+        y_list = []
+        for idx in indices:
+            X, y = self.dataset[int(idx)]
+            X_list.append(X)
+            y_list.append(y)
+
+        # Stack into numpy arrays
+        X_batch = np.stack(X_list, axis=0) if len(X_list) > 0 else np.array([])
+        y_batch = np.stack(y_list, axis=0) if len(y_list) > 0 else np.array([])
+
+        yield X_batch, y_batch
 
     def __len__(self) -> int:
-        """Return dataset size."""
-        return self.dataset_size
+        """
+        Return number of batches (always 1).
+
+        Returns:
+            1 (single batch containing all data)
+        """
+        return 1
 
 
-def create_time_series_dataloader(
-    dataset,
-    batch_size: int = 32,
-    shuffle: bool = False,
-    num_workers: int = 0,
-    pin_memory: bool = False,
-    drop_last: bool = False,
-    block_shuffle_size: Optional[int] = None,
-    **kwargs,
-) -> DataLoader:
+class PyTorchDataLoader(BaseDataLoader):
     """
-    Create a DataLoader optimized for time series forecasting.
+    PyTorch DataLoader wrapper that inherits from torch.utils.data.DataLoader.
 
-    Args:
-        dataset: PyTorch Dataset instance
-        batch_size: Number of samples per batch
-        shuffle: Whether to shuffle data (False recommended for time series)
-        num_workers: Number of worker processes for data loading
-        pin_memory: Pin memory for faster GPU transfer
-        drop_last: Drop last incomplete batch
-        block_shuffle_size: Size for block-wise shuffling (preserves local temporal order)
-        **kwargs: Additional DataLoader arguments
+    This provides native PyTorch batching capabilities:
+    - Multi-process data loading (num_workers)
+    - GPU memory pinning (pin_memory)
+    - Advanced sampling strategies
+    - Efficient mini-batch iteration
 
-    Returns:
-        Configured PyTorch DataLoader
-    """
-    # Use custom sampler if shuffle is requested with block size
-    if shuffle and block_shuffle_size:
-        sampler = TimeSeriesSampler(dataset_size=len(dataset), shuffle=True, block_size=block_shuffle_size)
-        # Don't pass shuffle=True when using custom sampler
-        dataloader = DataLoader(
-            dataset=dataset,
-            batch_size=batch_size,
-            sampler=sampler,
-            num_workers=num_workers,
-            pin_memory=pin_memory,
-            drop_last=drop_last,
-            **kwargs,
-        )
-    else:
-        # Standard DataLoader
-        dataloader = DataLoader(
-            dataset=dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-            pin_memory=pin_memory,
-            drop_last=drop_last,
-            **kwargs,
-        )
+    Usage:
+        loader = PyTorchDataLoader(dataset, batch_size=64, num_workers=4)
+        for X_batch, y_batch in loader:
+            # X_batch and y_batch are numpy arrays (converted from tensors)
+            model.fit(X_batch, y_batch)
 
-    return dataloader
-
-
-class TimeSeriesDataLoaderFactory:
-    """
-    Factory class for creating different types of time series DataLoaders.
+    Hydra Config:
+        dataloader:
+            _target_: ml_portfolio.data.loaders.PyTorchDataLoader
+            batch_size: 64
+            shuffle: true
+            num_workers: 4
+            pin_memory: true
     """
 
-    @staticmethod
-    def create_train_loader(dataset, batch_size: int = 32, **kwargs) -> DataLoader:
-        """Create DataLoader for training with time series considerations."""
-        return create_time_series_dataloader(
-            dataset=dataset,
-            batch_size=batch_size,
-            shuffle=False,  # Keep temporal order for training
-            drop_last=True,  # Drop last incomplete batch
-            **kwargs,
-        )
+    def __init__(
+        self,
+        dataset,
+        batch_size: int = 32,
+        shuffle: bool = False,
+        num_workers: int = 0,
+        pin_memory: bool = False,
+        drop_last: bool = False,
+        **kwargs,
+    ):
+        """
+        Initialize PyTorchDataLoader.
 
-    @staticmethod
-    def create_val_loader(dataset, batch_size: int = 32, **kwargs) -> DataLoader:
-        """Create DataLoader for validation."""
-        return create_time_series_dataloader(
-            dataset=dataset,
-            batch_size=batch_size,
-            shuffle=False,  # Never shuffle validation data
-            drop_last=False,  # Keep all validation data
-            **kwargs,
-        )
+        Args:
+            dataset: Dataset with __len__ and __getitem__
+            batch_size: Number of samples per batch
+            shuffle: Whether to shuffle data before each epoch
+            num_workers: Number of worker processes for data loading
+            pin_memory: Whether to pin memory for faster GPU transfer
+            drop_last: Whether to drop the last incomplete batch
+            **kwargs: Additional PyTorch DataLoader parameters
+        """
+        # Import PyTorch DataLoader
+        try:
+            from torch.utils.data import DataLoader as TorchDataLoader
 
-    @staticmethod
-    def create_test_loader(dataset, batch_size: int = 1, **kwargs) -> DataLoader:
-        """Create DataLoader for testing/inference."""
-        return create_time_series_dataloader(
-            dataset=dataset,
-            batch_size=batch_size,
-            shuffle=False,  # Never shuffle test data
-            drop_last=False,  # Keep all test data
-            **kwargs,
-        )
+            # Initialize the PyTorch DataLoader as the base class
+            self.torch_loader = TorchDataLoader(
+                dataset=dataset,
+                batch_size=batch_size,
+                shuffle=shuffle,
+                num_workers=num_workers,
+                pin_memory=pin_memory,
+                drop_last=drop_last,
+                **kwargs,
+            )
 
+            # Store parameters for BaseDataLoader interface
+            self.dataset = dataset
+            self.batch_size = batch_size
+            self.shuffle = shuffle
+            self.num_workers = num_workers
+            self.pin_memory = pin_memory
+            self.drop_last = drop_last
+            self.kwargs = kwargs
 
-def create_train_val_test_loaders(train_dataset, val_dataset, test_dataset, batch_size: int = 32, **kwargs):
-    """
-    Convenience function to create train, validation, and test DataLoaders.
+        except ImportError:
+            raise ImportError(
+                "PyTorch is required for PyTorchDataLoader. "
+                "Install with: pip install torch\n"
+                "Or use SimpleDataLoader instead."
+            )
 
-    Args:
-        train_dataset: Training dataset
-        val_dataset: Validation dataset
-        test_dataset: Test dataset
-        batch_size: Batch size for all loaders
-        **kwargs: Additional DataLoader arguments
+    def __iter__(self) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+        """
+        Iterate over batches from PyTorch DataLoader.
 
-    Returns:
-        Tuple of (train_loader, val_loader, test_loader)
-    """
-    factory = TimeSeriesDataLoaderFactory()
+        Yields:
+            Tuple of (X_batch, y_batch) as numpy arrays
+        """
+        for X_batch, y_batch in self.torch_loader:
+            # Convert tensors to numpy
+            if hasattr(X_batch, "numpy"):
+                X_batch = X_batch.numpy()
+            if hasattr(y_batch, "numpy"):
+                y_batch = y_batch.numpy()
 
-    train_loader = factory.create_train_loader(train_dataset, batch_size, **kwargs)
-    val_loader = factory.create_val_loader(val_dataset, batch_size, **kwargs)
-    test_loader = factory.create_test_loader(test_dataset, batch_size=1, **kwargs)
+            yield X_batch, y_batch
 
-    return train_loader, val_loader, test_loader
+    def __len__(self) -> int:
+        """
+        Return number of batches.
+
+        Returns:
+            Number of batches in the dataset
+        """
+        return len(self.torch_loader)

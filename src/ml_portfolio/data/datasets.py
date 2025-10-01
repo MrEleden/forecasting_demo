@@ -1,384 +1,513 @@
 """
-PyTorch Dataset wrappers for time series forecasting.
+PyTorch-friendly base Dataset class for time series forecasting.
 
-This module provides base Dataset classes that projects should inherit from for domain-specific customization.
-
-Project-specific inheritance pattern:
-    - WalmartTimeSeriesDataset(TimeSeriesDataset)
-    - OlaRideShareDataset(TimeSeriesDataset)
-    - InventoryDataset(TimeSeriesDataset)
-    - TSIDataset(TimeSeriesDataset)
+This module provides a flexible base class that child classes can inherit from
+to implement project-specific data loading, preprocessing, and feature engineering.
 """
 
 import numpy as np
 import pandas as pd
-from typing import Optional, Tuple, Union, List, Dict, Any
+from pathlib import Path
+from typing import Optional, Union, Tuple, List, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TimeSeriesDataset:
     """
-    Base PyTorch-style Dataset for time series forecasting.
+    Base PyTorch-compatible Dataset for time series forecasting.
 
-    This is a BASE CLASS that projects should inherit from for domain-specific customization.
+    This is the MAIN PARENT CLASS that all project-specific datasets inherit from.
+    Child classes override load_data() and preprocess_data() for domain-specific logic.
 
-    Project-specific inheritance pattern:
-        class WalmartTimeSeriesDataset(TimeSeriesDataset):
-            def __init__(self, data_path: str, **kwargs):
-                # Load Walmart-specific data
-                data = pd.read_csv(data_path)
-                super().__init__(data, **kwargs)
+    PyTorch Compatibility:
+    - Implements __len__() and __getitem__() for use with torch.utils.data.DataLoader
+    - Returns numpy arrays compatible with torch.from_numpy()
+    - Works seamlessly with both PyTorch and sklearn models
 
-            def _preprocess_walmart_data(self, data):
-                # Walmart-specific preprocessing (holidays, promotions)
-                return data
+    Key Methods Child Classes Override:
+    1. load_data(data_path) -> pd.DataFrame
+       - Load raw data from file
+       - Handle domain-specific file formats
 
-            def __getitem__(self, idx):
-                # Add Walmart-specific features to samples
-                X, y = super().__getitem__(idx)
-                X = self._add_holiday_features(X, idx)
-                return X, y
+    2. preprocess_data(df) -> pd.DataFrame
+       - Domain-specific preprocessing
+       - Feature engineering
+       - Data cleaning
 
-    Methods that projects commonly override:
-        - __init__(): Load domain-specific data
-        - _preprocess_data(): Add domain-specific preprocessing
-        - __getitem__(): Add domain-specific features to samples
-        - _create_sequences(): Customize windowing for domain
+    Example Child Class:
+        class WalmartDataset(TimeSeriesDataset):
+            def load_data(self, data_path: str) -> pd.DataFrame:
+                df = pd.read_csv(data_path)
+                # Walmart-specific loading logic
+                return df
+
+            def preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
+                # Add holiday features
+                df['is_holiday'] = self._add_holidays(df)
+                # Add store embeddings
+                df = self._add_store_features(df)
+                return df
     """
 
     def __init__(
         self,
-        data: Union[pd.DataFrame, np.ndarray],
-        target_column: str = None,
+        data_path: Optional[str] = None,
+        target_column: Optional[str] = None,
+        feature_columns: Optional[List[str]] = None,
         lookback_window: int = 24,
         forecast_horizon: int = 1,
         stride: int = 1,
-        include_features: Optional[List[str]] = None,
+        train_ratio: float = 0.7,
+        validation_ratio: float = 0.15,
+        test_ratio: float = 0.15,
+        mode: str = "train",  # NEW: train, val, or test mode
         **kwargs,
     ):
         """
         Initialize TimeSeriesDataset.
 
         Args:
-            data: Time series data (DataFrame or array)
-            target_column: Name of target column (for DataFrames)
-            lookback_window: Number of past observations to use
-            forecast_horizon: Number of future observations to predict
+            data_path: Path to data file (if None, child class must handle)
+            target_column: Name of column to predict
+            feature_columns: List of feature column names (None = all except target)
+            lookback_window: Number of past timesteps for input
+            forecast_horizon: Number of future timesteps to predict
             stride: Step size between sequences
-            include_features: List of feature columns to include
-            **kwargs: Additional parameters for project-specific datasets
+            train_ratio: Proportion of data for training
+            validation_ratio: Proportion of data for validation
+            test_ratio: Proportion of data for testing
+            mode: Dataset mode - 'train', 'val', or 'test'
+            **kwargs: Additional parameters for child classes
         """
-        self.data = data
+        # Store configuration
+        self.data_path = data_path
         self.target_column = target_column
+        self.feature_columns = feature_columns
         self.lookback_window = lookback_window
         self.forecast_horizon = forecast_horizon
         self.stride = stride
-        self.include_features = include_features
+        self.train_ratio = train_ratio
+        self.validation_ratio = validation_ratio
+        self.test_ratio = test_ratio
+        self.mode = mode  # NEW: train/val/test mode
+        self.kwargs = kwargs
 
-        # Preprocess data (can be overridden by projects)
-        self.processed_data = self._preprocess_data(data)
+        # Data containers (populated by load())
+        self.raw_data = None
+        self.processed_data = None
+        self.sequences = None
+        self.X = None  # Feature matrix
+        self.y = None  # Target vector
 
-        # Create sequences
-        self.sequences = self._create_sequences()
+        # Split indices (populated after load())
+        self.train_indices = None
+        self.val_indices = None
+        self.test_indices = None
 
-    def _preprocess_data(self, data: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
+        # Metadata
+        self.feature_names = []
+        self.data_info = {}
+
+        logger.info(f"Initialized {self.__class__.__name__}")
+
+    def load(self) -> "TimeSeriesDataset":
         """
-        Preprocess data before creating sequences.
-        Override in project-specific classes for domain-specific preprocessing.
+        Main entry point: Load and prepare dataset.
+
+        This method orchestrates the full data pipeline:
+        1. load_data() -> Load raw data
+        2. preprocess_data() -> Clean and engineer features
+        3. _extract_features_targets() -> Separate X and y
+        4. _create_sequences() -> Create windowed sequences (if needed)
+
+        Returns:
+            self (for method chaining)
+        """
+        logger.info(f"Loading data for {self.__class__.__name__}...")
+
+        # Step 1: Load raw data
+        if self.data_path:
+            self.raw_data = self.load_data(self.data_path)
+            logger.info(
+                f"Loaded raw data: {self.raw_data.shape if hasattr(self.raw_data, 'shape') else len(self.raw_data)} samples"
+            )
+        else:
+            logger.warning("No data_path provided. Child class must handle data loading.")
+
+        # Step 2: Preprocess
+        if self.raw_data is not None:
+            self.processed_data = self.preprocess_data(self.raw_data)
+            logger.info(f"Preprocessed data: {self.processed_data.shape}")
+
+        # Step 3: Extract features and targets
+        if self.processed_data is not None:
+            self.X, self.y, self.feature_names = self._extract_features_targets(self.processed_data)
+            logger.info(f"Features: {self.X.shape}, Targets: {self.y.shape}")
+            logger.info(f"Feature names: {self.feature_names}")
+
+        # Step 4: Create sequences (optional, for sequence-to-sequence models)
+        # For now, keep it simple: each row is a sample
+        # Child classes can override to create sliding windows
+
+        # Step 5: Compute split indices for train/val/test modes
+        self._compute_split_indices()
+
+        logger.info(f"Dataset ready: {len(self)} samples in '{self.mode}' mode")
+        return self
+
+    def load_data(self, data_path: str) -> pd.DataFrame:
+        """
+        Load raw data from file.
+
+        **OVERRIDE THIS in child classes for domain-specific loading.**
 
         Args:
-            data: Raw data
+            data_path: Path to data file
 
         Returns:
-            Preprocessed data as numpy array
+            Raw data as DataFrame
+
+        Example:
+            class WalmartDataset(TimeSeriesDataset):
+                def load_data(self, data_path: str) -> pd.DataFrame:
+                    df = pd.read_csv(data_path)
+                    df['Date'] = pd.to_datetime(df['Date'])
+                    df = df.sort_values(['Store', 'Dept', 'Date'])
+                    return df
         """
-        if isinstance(data, pd.DataFrame):
-            if self.target_column:
-                target = data[self.target_column].values
-                if self.include_features:
-                    features = data[self.include_features].values
-                    return np.column_stack([target.reshape(-1, 1), features])
-                else:
-                    return target.reshape(-1, 1)
-            else:
-                return data.values
+        path = Path(data_path)
+
+        if not path.exists():
+            raise FileNotFoundError(f"Data file not found: {data_path}")
+
+        # Default loading logic
+        if path.suffix == ".csv":
+            return pd.read_csv(data_path)
+        elif path.suffix == ".parquet":
+            return pd.read_parquet(data_path)
+        elif path.suffix in [".xlsx", ".xls"]:
+            return pd.read_excel(data_path)
         else:
-            return np.array(data)
+            raise ValueError(f"Unsupported file format: {path.suffix}")
 
-    def _create_sequences(self) -> List[Tuple[np.ndarray, np.ndarray]]:
+    def preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Create sequences from processed data.
-        Override in project-specific classes for custom windowing strategies.
+        Preprocess and engineer features.
+
+        **OVERRIDE THIS in child classes for domain-specific preprocessing.**
+
+        Args:
+            df: Raw data DataFrame
 
         Returns:
-            List of (input_sequence, target_sequence) tuples
+            Preprocessed DataFrame with engineered features
+
+        Example:
+            class WalmartDataset(TimeSeriesDataset):
+                def preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
+                    # Handle missing values
+                    df = df.fillna(method='ffill')
+
+                    # Add temporal features
+                    df['week_of_year'] = df['Date'].dt.isocalendar().week
+                    df['month'] = df['Date'].dt.month
+
+                    # Add domain features
+                    df['is_holiday'] = self._identify_holidays(df)
+                    df['days_to_holiday'] = self._days_to_next_holiday(df)
+
+                    return df
         """
-        sequences = []
-        data = self.processed_data
+        # Default: basic cleaning
+        df = df.copy()
 
-        for i in range(0, len(data) - self.lookback_window - self.forecast_horizon + 1, self.stride):
-            # Input sequence (past observations)
-            X = data[i : i + self.lookback_window]
+        # Handle missing values
+        if df.isnull().any().any():
+            logger.warning("Missing values detected. Filling with forward fill.")
+            df = df.fillna(method="ffill").fillna(method="bfill")
 
-            # Target sequence (future observations)
-            y = data[i + self.lookback_window : i + self.lookback_window + self.forecast_horizon]
+        # Sort by time if date column exists
+        date_cols = [col for col in df.columns if "date" in col.lower() or "time" in col.lower()]
+        if date_cols:
+            df = df.sort_values(date_cols[0]).reset_index(drop=True)
 
-            # For single-step prediction, flatten target
-            if self.forecast_horizon == 1:
-                y = y.ravel()
+        return df
 
-            sequences.append((X, y))
+    def _extract_features_targets(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+        """
+        Extract feature matrix X and target vector y from preprocessed data.
 
-        return sequences
+        Args:
+            df: Preprocessed DataFrame
+
+        Returns:
+            Tuple of (X, y, feature_names)
+        """
+        # Identify target column
+        if self.target_column:
+            if self.target_column not in df.columns:
+                raise ValueError(f"Target column '{self.target_column}' not found in data")
+            y = df[self.target_column].values
+        else:
+            # Default: last column is target
+            y = df.iloc[:, -1].values
+            self.target_column = df.columns[-1]
+
+        # Identify feature columns
+        if self.feature_columns:
+            # Use specified features
+            missing = set(self.feature_columns) - set(df.columns)
+            if missing:
+                raise ValueError(f"Feature columns not found: {missing}")
+            X = df[self.feature_columns].values
+            feature_names = self.feature_columns
+        else:
+            # Use all columns except target and non-numeric columns
+            exclude_cols = [self.target_column]
+            # Exclude date/time columns
+            exclude_cols.extend([col for col in df.columns if "date" in col.lower() or "time" in col.lower()])
+
+            feature_cols = [col for col in df.columns if col not in exclude_cols]
+
+            # Only keep numeric columns
+            numeric_cols = df[feature_cols].select_dtypes(include=[np.number]).columns.tolist()
+
+            if not numeric_cols:
+                # If no features, create time index
+                X = np.arange(len(df)).reshape(-1, 1)
+                feature_names = ["time_index"]
+            else:
+                X = df[numeric_cols].values
+                feature_names = numeric_cols
+
+        return X, y, feature_names
+
+    def _compute_split_indices(self):
+        """Compute train/val/test split indices based on ratios."""
+        if self.X is None:
+            return
+
+        n_samples = len(self.X)
+        train_end = int(n_samples * self.train_ratio)
+        val_end = int(n_samples * (self.train_ratio + self.validation_ratio))
+
+        self.train_indices = np.arange(0, train_end)
+        self.val_indices = np.arange(train_end, val_end)
+        self.test_indices = np.arange(val_end, n_samples)
+
+        logger.info(
+            f"Split indices computed: train={len(self.train_indices)}, val={len(self.val_indices)}, test={len(self.test_indices)}"
+        )
+
+    def set_mode(self, mode: str):
+        """
+        Set dataset mode (train/val/test).
+
+        Args:
+            mode: One of 'train', 'val', or 'test'
+        """
+        if mode not in ["train", "val", "test"]:
+            raise ValueError(f"Mode must be 'train', 'val', or 'test', got '{mode}'")
+        self.mode = mode
+        logger.info(f"Dataset mode set to: {mode}")
+
+    def _get_active_indices(self) -> np.ndarray:
+        """Get indices for current mode (train/val/test)."""
+        if self.train_indices is None:
+            self._compute_split_indices()
+
+        if self.mode == "train":
+            return self.train_indices
+        elif self.mode == "val":
+            return self.val_indices
+        else:  # test
+            return self.test_indices
 
     def __len__(self) -> int:
-        """Return number of sequences in dataset."""
-        return len(self.sequences)
+        """Return number of samples in current mode (PyTorch DataLoader compatible)."""
+        if self.X is not None:
+            indices = self._get_active_indices()
+            return len(indices)
+        return 0
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Get a single sequence by index.
-        Override in project-specific classes to add domain-specific features.
+        Get a single sample in current mode (PyTorch DataLoader compatible).
 
         Args:
-            idx: Sequence index
+            idx: Sample index (relative to current mode)
 
         Returns:
-            (input_sequence, target_sequence) tuple
+            Tuple of (features, target)
         """
-        return self.sequences[idx]
+        if self.X is None or self.y is None:
+            raise RuntimeError("Dataset not loaded. Call dataset.load() first.")
+
+        # Map idx to actual data index based on current mode
+        indices = self._get_active_indices()
+        actual_idx = indices[idx]
+
+        return self.X[actual_idx], self.y[actual_idx]
+
+    def get_splits(
+        self, train_ratio: Optional[float] = None, val_ratio: Optional[float] = None, test_ratio: Optional[float] = None
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Get temporal train/val/test splits.
+
+        Args:
+            train_ratio: Training proportion (uses self.train_ratio if None)
+            val_ratio: Validation proportion (uses self.validation_ratio if None)
+            test_ratio: Test proportion (uses self.test_ratio if None)
+
+        Returns:
+            Tuple of (X_train, y_train, X_val, y_val, X_test, y_test)
+        """
+        if self.X is None or self.y is None:
+            raise RuntimeError("Dataset not loaded. Call dataset.load() first.")
+
+        # Use provided ratios or defaults
+        train_ratio = train_ratio if train_ratio is not None else self.train_ratio
+        val_ratio = val_ratio if val_ratio is not None else self.validation_ratio
+        test_ratio = test_ratio if test_ratio is not None else self.test_ratio
+
+        # Validate ratios
+        if not np.isclose(train_ratio + val_ratio + test_ratio, 1.0):
+            logger.warning(f"Split ratios don't sum to 1.0: {train_ratio + val_ratio + test_ratio}. Normalizing...")
+            total = train_ratio + val_ratio + test_ratio
+            train_ratio /= total
+            val_ratio /= total
+            test_ratio /= total
+
+        # Calculate split indices (temporal order preserved)
+        n_samples = len(self.X)
+        train_end = int(n_samples * train_ratio)
+        val_end = int(n_samples * (train_ratio + val_ratio))
+
+        # Split data
+        X_train, y_train = self.X[:train_end], self.y[:train_end]
+        X_val, y_val = self.X[train_end:val_end], self.y[train_end:val_end]
+        X_test, y_test = self.X[val_end:], self.y[val_end:]
+
+        logger.info(f"Splits: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}")
+
+        return X_train, y_train, X_val, y_val, X_test, y_test
 
     def get_data_info(self) -> Dict[str, Any]:
         """
-        Get information about the dataset.
+        Get dataset information.
 
         Returns:
-            Dictionary with dataset information
+            Dictionary with dataset metadata
         """
         return {
-            "num_sequences": len(self),
+            "class": self.__class__.__name__,
+            "n_samples": len(self),
+            "n_features": self.X.shape[1] if self.X is not None and self.X.ndim > 1 else 0,
+            "feature_names": self.feature_names,
+            "target_column": self.target_column,
             "lookback_window": self.lookback_window,
             "forecast_horizon": self.forecast_horizon,
-            "stride": self.stride,
-            "input_shape": self.sequences[0][0].shape if self.sequences else None,
-            "target_shape": self.sequences[0][1].shape if self.sequences else None,
-            "data_shape": self.processed_data.shape,
+            "split_ratios": {"train": self.train_ratio, "validation": self.validation_ratio, "test": self.test_ratio},
         }
+
+    def to_pytorch(self):
+        """
+        Convert to PyTorch tensors (optional utility).
+
+        Returns:
+            Dataset compatible with torch.utils.data.DataLoader
+        """
+        try:
+            import torch
+            from torch.utils.data import TensorDataset
+
+            if self.X is None or self.y is None:
+                raise RuntimeError("Dataset not loaded. Call dataset.load() first.")
+
+            X_tensor = torch.from_numpy(self.X).float()
+            y_tensor = torch.from_numpy(self.y).float()
+
+            return TensorDataset(X_tensor, y_tensor)
+        except ImportError:
+            raise ImportError("PyTorch not installed. Install with: pip install torch")
 
 
 class MultiSeriesDataset(TimeSeriesDataset):
     """
-    Base Dataset for multiple time series (e.g., multiple stores, products).
+    Base class for datasets with multiple time series (e.g., multiple stores, products, zones).
 
-    This is a BASE CLASS for project-specific multi-series implementations.
+    Inherits from TimeSeriesDataset and adds multi-entity handling.
 
-    Project-specific inheritance examples:
+    Example:
         class WalmartMultiStoreDataset(MultiSeriesDataset):
             def __init__(self, data_path: str, **kwargs):
-                data = pd.read_csv(data_path)
-                super().__init__(data, series_column='Store', **kwargs)
-
-            def _add_store_features(self, X, series_id, sequence_idx):
-                # Add store-specific features (size, location, demographics)
-                return X
-
-        class OlaMultiZoneDataset(MultiSeriesDataset):
-            def __init__(self, data_path: str, **kwargs):
-                data = pd.read_csv(data_path)
-                super().__init__(data, series_column='pickup_zone', **kwargs)
+                super().__init__(
+                    data_path=data_path,
+                    series_column='Store',
+                    target_column='Weekly_Sales',
+                    **kwargs
+                )
     """
 
-    def __init__(self, data: pd.DataFrame, series_column: str, target_column: str = None, **kwargs):
+    def __init__(self, series_column: str, **kwargs):
         """
         Initialize MultiSeriesDataset.
 
         Args:
-            data: Time series data with multiple series
-            series_column: Column identifying different series (e.g., 'Store', 'Product')
-            target_column: Name of target column
-            **kwargs: Additional parameters passed to parent class
+            series_column: Column identifying different series (e.g., 'Store', 'Product', 'Zone')
+            **kwargs: Arguments passed to TimeSeriesDataset
         """
         self.series_column = series_column
-        self.series_ids = data[series_column].unique()
+        self.series_ids = None
+        self.n_series = 0
 
-        # Store original data
-        self.original_data = data
+        super().__init__(**kwargs)
 
-        # Initialize with first series (will be updated in _create_sequences)
-        first_series_data = data[data[series_column] == self.series_ids[0]]
-        super().__init__(first_series_data, target_column=target_column, **kwargs)
-
-    def _create_sequences(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
+    def preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Create sequences from all series.
-
-        Returns:
-            List of (input_sequence, target_sequence, series_id) tuples
-        """
-        all_sequences = []
-
-        for series_id in self.series_ids:
-            # Get data for this series
-            series_data = self.original_data[self.original_data[self.series_column] == series_id]
-
-            # Preprocess series data
-            processed_series = self._preprocess_data(series_data)
-
-            # Create sequences for this series
-            for i in range(0, len(processed_series) - self.lookback_window - self.forecast_horizon + 1, self.stride):
-                X = processed_series[i : i + self.lookback_window]
-                y = processed_series[i + self.lookback_window : i + self.lookback_window + self.forecast_horizon]
-
-                if self.forecast_horizon == 1:
-                    y = y.ravel()
-
-                all_sequences.append((X, y, series_id))
-
-        return all_sequences
-
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray, str]:
-        """
-        Get a single sequence by index.
+        Preprocess multi-series data.
 
         Args:
-            idx: Sequence index
+            df: Raw data with multiple series
 
         Returns:
-            (input_sequence, target_sequence, series_id) tuple
+            Preprocessed DataFrame
         """
-        return self.sequences[idx]
+        # Identify unique series
+        if self.series_column not in df.columns:
+            raise ValueError(f"Series column '{self.series_column}' not found in data")
 
+        self.series_ids = df[self.series_column].unique()
+        self.n_series = len(self.series_ids)
 
-class SlidingWindowDataset(TimeSeriesDataset):
-    """
-    Base Dataset with sliding window approach for online learning.
+        logger.info(f"Found {self.n_series} series in column '{self.series_column}'")
 
-    This is a BASE CLASS for project-specific sliding window implementations.
-    """
+        # Sort by series and time
+        date_cols = [col for col in df.columns if "date" in col.lower() or "time" in col.lower()]
+        if date_cols:
+            df = df.sort_values([self.series_column, date_cols[0]]).reset_index(drop=True)
 
-    def __init__(self, data: Union[pd.DataFrame, np.ndarray], window_size: int = 100, **kwargs):
+        # Call parent preprocessing
+        return super().preprocess_data(df)
+
+    def get_series_data(self, series_id: Any) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Initialize SlidingWindowDataset.
+        Get data for a specific series.
 
         Args:
-            window_size: Size of sliding window for training
-            **kwargs: Additional parameters passed to parent class
-        """
-        self.window_size = window_size
-        super().__init__(data, **kwargs)
-
-    def get_window(self, start_idx: int) -> "TimeSeriesDataset":
-        """
-        Get a sliding window as a new dataset.
-
-        Args:
-            start_idx: Starting index for the window
+            series_id: ID of the series to extract
 
         Returns:
-            New TimeSeriesDataset with windowed data
+            Tuple of (X, y) for that series
         """
-        end_idx = min(start_idx + self.window_size, len(self.processed_data))
-        windowed_data = self.processed_data[start_idx:end_idx]
+        if self.processed_data is None:
+            raise RuntimeError("Dataset not loaded. Call dataset.load() first.")
 
-        return TimeSeriesDataset(
-            windowed_data,
-            lookback_window=self.lookback_window,
-            forecast_horizon=self.forecast_horizon,
-            stride=self.stride,
-        )
+        mask = self.processed_data[self.series_column] == series_id
+        series_data = self.processed_data[mask]
 
-
-# Factory Functions for Project-Specific Dataset Creation
-
-
-def create_project_dataset_class(project_name: str, dataset_type: str = "single", base_class=None):
-    """
-    Factory function to create project-specific dataset classes following naming conventions.
-
-    This function creates classes that follow the pattern: {ProjectName}{DatasetType}Dataset
-
-    Args:
-        project_name: Name of the project (e.g., "Walmart", "Ola", "Inventory", "TSI")
-        dataset_type: Type of dataset ("TimeSeries", "MultiSeries", "SlidingWindow")
-        base_class: Base class to inherit from (auto-detected if None)
-
-    Returns:
-        Project-specific dataset class
-
-    Example:
-        WalmartTimeSeriesDataset = create_project_dataset_class("Walmart", "TimeSeries")
-        OlaMultiSeriesDataset = create_project_dataset_class("Ola", "MultiSeries")
-    """
-    if base_class is None:
-        if dataset_type.lower() == "timeseries" or dataset_type.lower() == "single":
-            base_class = TimeSeriesDataset
-        elif dataset_type.lower() == "multiseries" or dataset_type.lower() == "multi":
-            base_class = MultiSeriesDataset
-        elif dataset_type.lower() == "slidingwindow" or dataset_type.lower() == "sliding":
-            base_class = SlidingWindowDataset
-        else:
-            base_class = TimeSeriesDataset
-
-    class_name = f"{project_name}{dataset_type}Dataset"
-
-    class ProjectDatasetClass(base_class):
-        """Dynamically created project-specific dataset class."""
-
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-            self.project_name = project_name
-            self.dataset_type = dataset_type
-
-        def __repr__(self):
-            return f"{class_name}(project={self.project_name}, type={self.dataset_type}, num_sequences={len(self)})"
-
-    ProjectDatasetClass.__name__ = class_name
-    ProjectDatasetClass.__qualname__ = class_name
-
-    return ProjectDatasetClass
-
-
-def get_project_dataset_params(project_name: str) -> Dict[str, Any]:
-    """
-    Get recommended dataset parameters for specific projects.
-
-    Args:
-        project_name: Project name
-
-    Returns:
-        Dictionary of recommended parameters
-    """
-    params = {}
-
-    if project_name.lower() == "walmart":
-        params = {
-            "lookback_window": 52,  # 52 weeks of history
-            "forecast_horizon": 1,  # 1 week ahead
-            "stride": 1,
-            "target_column": "Weekly_Sales",
-        }
-
-    elif project_name.lower() == "ola" or project_name.lower() == "rideshare":
-        params = {
-            "lookback_window": 24,  # 24 hours of history
-            "forecast_horizon": 1,  # 1 hour ahead
-            "stride": 1,
-            "target_column": "demand",
-        }
-
-    elif project_name.lower() == "inventory":
-        params = {
-            "lookback_window": 30,  # 30 days of history
-            "forecast_horizon": 7,  # 7 days ahead
-            "stride": 1,
-            "target_column": "demand",
-        }
-
-    elif project_name.lower() == "tsi" or project_name.lower() == "transportation":
-        params = {
-            "lookback_window": 12,  # 12 months of history
-            "forecast_horizon": 1,  # 1 month ahead
-            "stride": 1,
-            "target_column": "value",
-        }
-
-    return params
+        X, y, _ = self._extract_features_targets(series_data)
+        return X, y
