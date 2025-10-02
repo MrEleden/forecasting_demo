@@ -50,7 +50,12 @@ class TrainingEngine:
         test_dataset=None,
         optimizer=None,
         scheduler=None,
-        config: Optional[Dict[str, Any]] = None,
+        max_epochs: int = 100,
+        patience: int = 10,
+        early_stopping: bool = True,
+        verbose: bool = True,
+        monitor_metric: str = "val_loss",
+        min_delta: float = 1e-4,
     ):
         """
         Initialize TrainingEngine.
@@ -63,7 +68,12 @@ class TrainingEngine:
             test_dataset: Test dataloader (iterator yielding batches)
             optimizer: PyTorch optimizer (optional, for deep learning models)
             scheduler: Learning rate scheduler (optional, for deep learning models)
-            config: Training configuration (optional)
+            max_epochs: Maximum number of training epochs
+            patience: Number of epochs to wait for improvement before early stopping
+            early_stopping: Whether to enable early stopping
+            verbose: Whether to log training progress
+            monitor_metric: Metric to monitor for early stopping
+            min_delta: Minimum improvement threshold for early stopping
         """
         self.model = model
         self.metrics = metrics or {}
@@ -72,15 +82,14 @@ class TrainingEngine:
         self.test_dataset = test_dataset
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.config = config or {}
 
-        # Training parameters
-        self.max_epochs = self.config.get("max_epochs", 100)
-        self.patience = self.config.get("patience", 10)
-        self.early_stopping = self.config.get("early_stopping", True)
-        self.verbose = self.config.get("verbose", True)
-        self.monitor_metric = self.config.get("monitor_metric", "val_loss")
-        self.min_delta = self.config.get("min_delta", 1e-4)
+        # Training parameters (now passed directly)
+        self.max_epochs = max_epochs
+        self.patience = patience
+        self.early_stopping = early_stopping
+        self.verbose = verbose
+        self.monitor_metric = monitor_metric
+        self.min_delta = min_delta
 
         # Training history
         self.history = {"train_loss": [], "val_loss": [], "train_metrics": [], "val_metrics": [], "epoch_times": []}

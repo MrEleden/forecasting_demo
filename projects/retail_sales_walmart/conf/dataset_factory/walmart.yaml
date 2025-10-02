@@ -1,0 +1,30 @@
+# Walmart Dataset Factory Configuration
+# Creates train/val/test TimeSeriesDataset splits via WalmartFactory
+
+_target_: projects.retail_sales_walmart.data.walmart_dataset.WalmartFactory
+
+# The dataset class to instantiate for each split
+dataset_class: ml_portfolio.data.datasets.TimeSeriesDataset
+
+# Split ratios (must sum to 1.0)
+train_ratio: 0.7
+validation_ratio: 0.15
+test_ratio: 0.15
+
+# Dataset constructor arguments (passed to each TimeSeriesDataset instance)
+data_path: projects/retail_sales_walmart/data/raw/Walmart.csv
+target_column: Weekly_Sales
+
+# Walmart-specific feature flags
+include_store_features: true
+include_dept_features: true
+include_holiday_features: true
+include_economic_features: true
+
+# Time series parameters
+lookback_window: 52  # 1 year of weekly data
+forecast_horizon: 12  # 12 weeks ahead
+
+# Preprocessing
+scaling: standard  # standard, minmax, robust, or null
+handle_missing: ffill  # forward fill missing values

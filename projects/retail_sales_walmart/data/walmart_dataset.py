@@ -1,25 +1,44 @@
 """
-Walmart-specific dataset implementation.
-Inherits from TimeSeriesDataset for domain-specific data loading and preprocessing.
+Walmart-specific dataset factory implementation.
+Creates train/val/test TimeSeriesDataset splits with Walmart-specific preprocessing.
 """
 
 import sys
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from typing import Optional
+from typing import Optional, Tuple
 import logging
 
 # Add src to path for imports
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from ml_portfolio.data.datasets import TimeSeriesDataset
+from ml_portfolio.data.datasets import TimeSeriesDataset, DatasetFactory
 
 logger = logging.getLogger(__name__)
 
 
-class WalmartDataset(TimeSeriesDataset):
+class WalmartFactory(DatasetFactory):
+    """
+    Walmart sales forecasting dataset factory.
+
+    Creates train/val/test TimeSeriesDataset splits with Walmart-specific data loading
+    and preprocessing logic.
+
+    Usage:
+        # Via Hydra (recommended)
+        factory = hydra.utils.instantiate(cfg.dataset)
+        train_dataset, val_dataset, test_dataset = factory.create_datasets()
+
+        # Direct instantiation
+        factory = WalmartFactory(
+            data_path="data/raw/Walmart.csv",
+            target_column="Weekly_Sales"
+        )
+        train_dataset, val_dataset, test_dataset = factory.create_datasets()
+    """
+
     """
     Walmart sales forecasting dataset.
 
@@ -44,23 +63,31 @@ class WalmartDataset(TimeSeriesDataset):
         self,
         data_path: Optional[str] = None,
         target_column: str = "Weekly_Sales",
+        train_ratio: float = 0.7,
+        validation_ratio: float = 0.15,
+        test_ratio: float = 0.15,
         include_store_features: bool = True,
         include_dept_features: bool = True,
         include_holiday_features: bool = True,
         include_economic_features: bool = True,
+        dataset_class: str = "ml_portfolio.data.datasets.TimeSeriesDataset",
         **kwargs,
     ):
         """
-        Initialize Walmart dataset.
+        Initialize Walmart dataset factory.
 
         Args:
             data_path: Path to Walmart.csv (relative to project root)
             target_column: Column to predict (default: Weekly_Sales)
+            train_ratio: Training split ratio
+            validation_ratio: Validation split ratio
+            test_ratio: Test split ratio
             include_store_features: Whether to include store ID as feature
             include_dept_features: Whether to include department ID as feature
             include_holiday_features: Whether to include holiday flags
             include_economic_features: Whether to include CPI, unemployment, etc.
-            **kwargs: Additional arguments passed to TimeSeriesDataset
+            dataset_class: The base dataset class to instantiate
+            **kwargs: Additional arguments passed to TimeSeriesDataset instances
         """
         # Store Walmart-specific configuration
         self.include_store_features = include_store_features
@@ -68,17 +95,115 @@ class WalmartDataset(TimeSeriesDataset):
         self.include_holiday_features = include_holiday_features
         self.include_economic_features = include_economic_features
 
-        # Set default parameters for Walmart
-        kwargs.setdefault("lookback_window", 52)  # 1 year of weekly data
-        kwargs.setdefault("forecast_horizon", 12)  # 12 weeks ahead
-        kwargs.setdefault("train_ratio", 0.7)
-        kwargs.setdefault("validation_ratio", 0.15)
-        kwargs.setdefault("test_ratio", 0.15)
+        # Initialize parent DatasetFactory
+        super().__init__(
+            dataset_class=dataset_class,
+            train_ratio=train_ratio,
+            validation_ratio=validation_ratio,
+            test_ratio=test_ratio,
+            data_path=data_path,
+            target_column=target_column,
+            **kwargs,
+        )
+        self.kwargs = kwargs
 
-        # Initialize parent class
-        super().__init__(data_path=data_path, target_column=target_column, **kwargs)
+        # Validate ratios
+        if not np.isclose(train_ratio + validation_ratio + test_ratio, 1.0):
+            raise ValueError(f"Split ratios must sum to 1.0, got {train_ratio + validation_ratio + test_ratio}")
 
-        logger.info(f"Initialized WalmartDataset with path: {data_path}")
+        logger.info(f"Initialized WalmartFactory with path: {data_path}")
+
+    def create_datasets(self) -> Tuple[TimeSeriesDataset, TimeSeriesDataset, TimeSeriesDataset]:
+        """
+        Create train, validation, and test datasets with Walmart-specific preprocessing.
+
+        Returns:
+            Tuple of (train_dataset, val_dataset, test_dataset)
+        """
+        logger.info(f"Walmart factory loading data from: {self.data_path}")
+
+        # Step 1: Load raw data
+        raw_data = self.load_data(self.data_path)
+        logger.info(f"Walmart factory loaded raw data: {raw_data.shape}")
+
+        # Step 2: Preprocess with Walmart-specific logic
+        processed_data = self.preprocess_data(raw_data)
+        logger.info(f"Walmart factory preprocessed data: {processed_data.shape}")
+
+        # Step 3: Extract features and targets
+        X, y, feature_names = self._extract_features_targets(processed_data)
+        logger.info(f"Walmart factory extracted features: {X.shape}, targets: {y.shape}")
+
+        # Step 4: Split data temporally (preserve chronological order)
+        n_samples = len(X)
+        train_end = int(n_samples * self.train_ratio)
+        val_end = int(n_samples * (self.train_ratio + self.validation_ratio))
+
+        X_train, y_train = X[:train_end], y[:train_end]
+        X_val, y_val = X[train_end:val_end], y[train_end:val_end]
+        X_test, y_test = X[val_end:], y[val_end:]
+
+        logger.info(f"Walmart factory splits: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}")
+
+        # Step 5: Create TimeSeriesDataset instances for each split
+        train_dataset = TimeSeriesDataset(data_path=self.data_path, target_column=self.target_column, **self.kwargs)
+        train_dataset.X = X_train
+        train_dataset.y = y_train
+        train_dataset.feature_names = feature_names
+        train_dataset.processed_data = processed_data
+
+        val_dataset = TimeSeriesDataset(data_path=self.data_path, target_column=self.target_column, **self.kwargs)
+        val_dataset.X = X_val
+        val_dataset.y = y_val
+        val_dataset.feature_names = feature_names
+        val_dataset.processed_data = processed_data
+
+        test_dataset = TimeSeriesDataset(data_path=self.data_path, target_column=self.target_column, **self.kwargs)
+        test_dataset.X = X_test
+        test_dataset.y = y_test
+        test_dataset.feature_names = feature_names
+        test_dataset.processed_data = processed_data
+
+        logger.info(
+            f"Created Walmart datasets - train: {len(train_dataset)}, val: {len(val_dataset)}, test: {len(test_dataset)}"
+        )
+
+        return train_dataset, val_dataset, test_dataset
+
+    def _extract_features_targets(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, list]:
+        """
+        Extract feature matrix X and target vector y from preprocessed data.
+
+        Args:
+            df: Preprocessed DataFrame
+
+        Returns:
+            Tuple of (X, y, feature_names)
+        """
+        # Identify target column
+        if self.target_column not in df.columns:
+            raise ValueError(f"Target column '{self.target_column}' not found in data")
+        y = df[self.target_column].values
+
+        # Use all columns except target and non-numeric columns
+        exclude_cols = [self.target_column]
+        # Exclude date/time columns
+        exclude_cols.extend([col for col in df.columns if "date" in col.lower() or "time" in col.lower()])
+
+        feature_cols = [col for col in df.columns if col not in exclude_cols]
+
+        # Only keep numeric columns
+        numeric_cols = df[feature_cols].select_dtypes(include=[np.number]).columns.tolist()
+
+        if not numeric_cols:
+            # If no features, create time index
+            X = np.arange(len(df)).reshape(-1, 1)
+            feature_names = ["time_index"]
+        else:
+            X = df[numeric_cols].values
+            feature_names = numeric_cols
+
+        return X, y, feature_names
 
     def load_data(self, data_path: str) -> pd.DataFrame:
         """
@@ -115,7 +240,8 @@ class WalmartDataset(TimeSeriesDataset):
         # Convert date column if exists
         date_cols = [col for col in df.columns if "date" in col.lower()]
         if date_cols:
-            df[date_cols[0]] = pd.to_datetime(df[date_cols[0]])
+            # Handle different date formats (dd-mm-yyyy, mm-dd-yyyy, etc.)
+            df[date_cols[0]] = pd.to_datetime(df[date_cols[0]], dayfirst=True, errors="coerce")
             # Sort by date for time series
             if "Store" in df.columns and "Dept" in df.columns:
                 df = df.sort_values(["Store", "Dept", date_cols[0]])

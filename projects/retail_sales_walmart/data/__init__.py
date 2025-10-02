@@ -2,6 +2,6 @@
 Walmart data module.
 """
 
-from .walmart_dataset import WalmartDataset
+from .walmart_dataset import WalmartFactory
 
-__all__ = ["WalmartDataset"]
+__all__ = ["WalmartFactory"]

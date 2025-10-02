@@ -1,5 +1,0 @@
-# Placeholder for Docker configurations
-# Future CI/CD Docker files will be stored here:
-# - Dockerfile (multi-stage builds)
-# - docker-compose.yml (integration testing)
-# - .dockerignore (build optimization)

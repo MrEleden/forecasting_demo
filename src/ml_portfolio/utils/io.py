@@ -5,6 +5,7 @@ I/O utilities for data loading, saving, and caching.
 import os
 import pickle
 import json
+import hashlib
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -333,8 +334,6 @@ def create_file_hash(filepath: Union[str, Path]) -> str:
     Returns:
         Hash string
     """
-    import hashlib
-
     filepath = Path(filepath)
     if not filepath.exists():
         return ""

@@ -1,0 +1,25 @@
+# Dataset Factory Configuration
+# Creates train/val/test dataset splits via factory pattern
+
+_target_: ml_portfolio.data.datasets.DatasetFactory
+
+# The dataset class to instantiate for each split
+dataset_class: ml_portfolio.data.datasets.TimeSeriesDataset
+
+# Split ratios (must sum to 1.0)
+train_ratio: 0.7
+validation_ratio: 0.15
+test_ratio: 0.15
+
+# Dataset constructor arguments (passed to each dataset instance)
+data_path: data/processed/train.parquet
+features: null  # List of feature columns, null = all except target
+target: target  # Target column name
+
+# Time series parameters
+lookback_window: 24  # Number of past timesteps to use
+forecast_horizon: 1  # Number of future timesteps to predict
+
+# Preprocessing
+scaling: standard  # standard, minmax, robust, or null
+handle_missing: ffill  # ffill, bfill, drop, or null

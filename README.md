@@ -40,7 +40,7 @@ ml-portfolio/
 - **🔧 Modular**: Reusable components across projects
 - **⚙️ Configurable**: Hydra-based object instantiation
 - **🎯 Optimized**: Optuna hyperparameter tuning
-- **📊 Production-Ready**: Docker, CI/CD, monitoring
+- **📊 Production-Ready**: Docker, monitoring, deployment
 - **🔄 Reproducible**: Experiment tracking, version control
 
 ## 🚀 Quick Start
@@ -130,8 +130,7 @@ python scripts/generate_data.py
 - **🌐 Streamlit**: Interactive dashboards
 - **🔌 FastAPI**: Production REST APIs
 - **🐳 Docker**: Containerization
-- **🔄 GitHub Actions**: CI/CD pipelines
-- **📊 MLflow**: Experiment tracking (optional)
+- ** MLflow**: Experiment tracking (optional)
 
 ## 📈 Model Development Workflow
 

@@ -18,6 +18,22 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import warnings
 
+# Optional PyTorch imports
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import DataLoader, TensorDataset
+
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None
+    nn = None
+    optim = None
+    DataLoader = None
+    TensorDataset = None
+    TORCH_AVAILABLE = False
+
 
 class SklearnTorchWrapper(BaseEstimator, RegressorMixin):
     """
@@ -77,10 +93,8 @@ class SklearnTorchWrapper(BaseEstimator, RegressorMixin):
         Returns:
             self
         """
-        import torch
-        import torch.nn as nn
-        import torch.optim as optim
-        from torch.utils.data import DataLoader, TensorDataset
+        if not TORCH_AVAILABLE:
+            raise ImportError("PyTorch is required for HybridLSTM but not installed.")
 
         # Convert to numpy arrays
         X = np.array(X)
@@ -178,7 +192,8 @@ class SklearnTorchWrapper(BaseEstimator, RegressorMixin):
         if self.model_ is None:
             raise ValueError("Model must be fitted before making predictions")
 
-        import torch
+        if not TORCH_AVAILABLE:
+            raise ImportError("PyTorch is required for HybridLSTM but not installed.")
 
         # Apply project-specific preprocessing
         X = self._preprocess_features(X)

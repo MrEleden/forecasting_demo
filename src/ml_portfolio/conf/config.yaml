@@ -2,9 +2,10 @@
 # This serves as the base configuration for all training runs
 
 defaults:
-  - dataloader: simple  # simple or pytorch
-  - dataset: default
+  - dataset_factory: default  # Use DatasetFactory for creating train/val/test splits
   - model: random_forest  # Statistical or ML models
+  - dataloader: simple  # DataLoader configuration (simple, pytorch)
+  - training: default  # Training configuration (default, deep_learning, statistical)
   - optimizer: null  # For deep learning models (adam, adamw, sgd)
   - scheduler: null  # LR scheduler for deep learning (step_lr, cosine, plateau)
   - metrics: default
@@ -13,16 +14,6 @@ defaults:
 # Optimizer and scheduler are optional (only for PyTorch models)
 # For sklearn models: set to null
 # For PyTorch models: specify optimizer=adam scheduler=step_lr
-
-# Training configuration
-training:
-  max_epochs: 1  # 1 for sklearn, >1 for PyTorch
-  early_stopping: false  # Enable for iterative training
-  patience: 10
-  min_delta: 0.0001
-  monitor_metric: val_loss
-  verbose: true
-  random_seed: 42
 
 # Logging and output
 logging:

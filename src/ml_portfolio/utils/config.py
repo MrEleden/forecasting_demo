@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass, field
 import warnings
+import yaml
 
 try:
     from omegaconf import OmegaConf, DictConfig
@@ -118,8 +119,6 @@ def load_config(config_path: Union[str, Path]) -> DictConfig:
             warnings.warn(f"Failed to load config with OmegaConf: {e}")
 
     # Fallback to basic YAML loading
-    import yaml
-
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
@@ -138,8 +137,6 @@ def save_config(config: DictConfig, output_path: Union[str, Path]) -> None:
     if OMEGACONF_AVAILABLE and isinstance(config, DictConfig):
         OmegaConf.save(config, output_path)
     else:
-        import yaml
-
         with open(output_path, "w") as f:
             yaml.dump(config, f, default_flow_style=False)
 

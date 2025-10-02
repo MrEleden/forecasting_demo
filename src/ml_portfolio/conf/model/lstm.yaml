@@ -16,3 +16,23 @@ forecast_horizon: 1
 
 # Training
 learning_rate: 0.001
+
+# Dataloader configuration for PyTorch models
+dataloader:
+  _target_: ml_portfolio.data.loaders.PyTorchDataLoader
+  batch_size: 64
+  shuffle: true
+  num_workers: 0
+  pin_memory: false
+  drop_last: false
+
+# Training configuration for PyTorch models
+training:
+  max_epochs: 100  # Iterative training for deep learning
+  early_stopping: true  # Enable early stopping
+  patience: 10  # Stop if no improvement for 10 epochs
+  min_delta: 0.0001  # Minimum improvement threshold
+  monitor_metric: val_loss  # Metric to monitor for early stopping
+  verbose: true
+  save_checkpoints: true
+  checkpoint_dir: models/checkpoints

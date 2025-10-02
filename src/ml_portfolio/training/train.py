@@ -13,7 +13,9 @@ Example:
 """
 
 import logging
+import random
 from typing import Dict, Any
+from pathlib import Path
 import numpy as np
 
 import hydra
@@ -47,40 +49,62 @@ def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
     # Set random seed for reproducibility
     if hasattr(cfg, "seed"):
         np.random.seed(cfg.seed)
-        import random
-
         random.seed(cfg.seed)
         logger.info(f"Random seed set to {cfg.seed}")
 
     # ========================================================================
-    # 1. Create datasets for train/val/test modes
+    # 0. load default config and overide with project-specific config
     # ========================================================================
-    logger.info(f"Creating datasets: {cfg.dataset._target_}")
+    # Store the original project config
+    project_cfg = cfg
 
-    train_dataset = hydra.utils.instantiate(cfg.dataset, mode="train")
-    train_dataset.load()
-    logger.info(f"Train dataset: {len(train_dataset)} samples")
+    # Load and resolve base configuration manually
+    base_config_dir = Path(__file__).parent.parent / "conf"
+    base_config_path = base_config_dir / "config.yaml"
+    base_cfg = OmegaConf.load(base_config_path)
 
-    val_dataset = hydra.utils.instantiate(cfg.dataset, mode="val")
-    val_dataset.load()
-    logger.info(f"Val dataset: {len(val_dataset)} samples")
+    # Manually resolve the defaults by loading each component config
+    if "defaults" in base_cfg:
+        defaults = base_cfg.defaults
+        for default in defaults:
+            if isinstance(default, str):
+                continue  # Skip _self_ and other special defaults
+            if isinstance(default, (dict, DictConfig)):
+                for key, value in default.items():
+                    if value and value != "null" and value is not None:  # Skip null values
+                        component_path = base_config_dir / key / f"{value}.yaml"
+                        if component_path.exists():
+                            component_cfg = OmegaConf.load(component_path)
+                            base_cfg[key] = component_cfg
+                            logger.info(f"Loaded {key}: {value}")
 
-    test_dataset = hydra.utils.instantiate(cfg.dataset, mode="test")
-    test_dataset.load()
-    logger.info(f"Test dataset: {len(test_dataset)} samples")
+    # Merge base config with project-specific config
+    cfg = OmegaConf.merge(base_cfg, project_cfg)
+    logger.info("Configuration successfully merged with base defaults")
 
-    # Log dataset info
+    # ========================================================================
+    # 1. Create datasets using factory pattern
+    # ========================================================================
+    logger.info(f"Creating dataset factory: {cfg.dataset._target_}")
+
+    # Create dataset factory and get the three dataset splits
+    dataset_factory = hydra.utils.instantiate(cfg.dataset)
+    train_dataset, val_dataset, test_dataset = dataset_factory.create_datasets()
+
+    logger.info(f"Created datasets - train: {len(train_dataset)}, val: {len(val_dataset)}, test: {len(test_dataset)}")
+
+    # Log dataset info from the train dataset (all should have same metadata)
     if hasattr(train_dataset, "get_data_info"):
         info = train_dataset.get_data_info()
         logger.info(f"Dataset info: {info}")
 
     # ========================================================================
-    # 2. Instantiate data loaders from configuration
+    # 2. instantiate dataloaders for each split
     # ========================================================================
-    # Get dataloader config (optional)
     dataloader_train = hydra.utils.instantiate(cfg.dataloader, dataset=train_dataset)
     dataloader_val = hydra.utils.instantiate(cfg.dataloader, dataset=val_dataset)
     dataloader_test = hydra.utils.instantiate(cfg.dataloader, dataset=test_dataset)
+
     # ========================================================================
     # 3. Instantiate model from configuration
     # ========================================================================
@@ -122,6 +146,10 @@ def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
     logger.info("Instantiating metrics...")
     metrics = {}
     for metric_name, metric_cfg in cfg.metrics.items():
+        # Skip simple config values that aren't metric objects
+        if metric_name in ["primary_metric", "minimize"]:
+            continue
+
         try:
             metrics[metric_name] = hydra.utils.instantiate(metric_cfg)
             logger.info(f"  - {metric_name}: {metric_cfg._target_}")
@@ -129,9 +157,21 @@ def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
             logger.warning(f"  - Failed to instantiate {metric_name}: {e}")
 
     # ========================================================================
-    # 7. Create training engine with all components
+    # 7. Extract training parameters and create training engine
     # ========================================================================
     logger.info("Creating TrainingEngine with datasets...")
+
+    # Extract training parameters from config
+    training_config = cfg.training if hasattr(cfg, "training") else {}
+    max_epochs = training_config.get("max_epochs", 100)
+    patience = training_config.get("patience", 10)
+    early_stopping = training_config.get("early_stopping", True)
+    verbose = training_config.get("verbose", True)
+    monitor_metric = training_config.get("monitor_metric", "val_loss")
+    min_delta = training_config.get("min_delta", 1e-4)
+
+    logger.info(f"Training parameters: max_epochs={max_epochs}, early_stopping={early_stopping}, patience={patience}")
+
     engine = TrainingEngine(
         model=model,
         metrics=metrics,
@@ -140,7 +180,12 @@ def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
         test_dataset=dataloader_test,
         optimizer=optimizer,
         scheduler=scheduler,
-        config=cfg.training if hasattr(cfg, "training") else {},
+        max_epochs=max_epochs,
+        patience=patience,
+        early_stopping=early_stopping,
+        verbose=verbose,
+        monitor_metric=monitor_metric,
+        min_delta=min_delta,
     )
 
     # ========================================================================
@@ -160,11 +205,6 @@ def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
     # ========================================================================
     logger.info("Evaluating on test set...")
     test_metrics = engine.evaluate_test()
-
-    # Log test metrics
-    logger.info("Test set results:")
-    for metric_name, metric_value in test_metrics.items():
-        logger.info(f"  {metric_name}: {metric_value:.4f}")
 
     # Return primary metric for optimization
     return test_metrics.get(cfg.get("primary_metric", "mse"), 0.0)
