@@ -1,0 +1,28 @@
+# Random Forest hyperparameter search space for Optuna
+
+# Number of estimators
+n_estimators_min: 50
+n_estimators_max: 500
+n_estimators_step: 50
+
+# Tree depth
+max_depth_min: 3
+max_depth_max: 20
+max_depth_step: 1
+
+# Feature sampling
+max_features_options: ["sqrt", "log2", 0.3, 0.5, 0.7, 1.0]
+
+# Sample sampling
+min_samples_split_min: 2
+min_samples_split_max: 20
+min_samples_leaf_min: 1
+min_samples_leaf_max: 10
+
+# Regularization
+max_leaf_nodes_min: 10
+max_leaf_nodes_max: 100
+
+# Other parameters
+bootstrap: [true, false]
+random_state: 42
