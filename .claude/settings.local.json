@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for project in projects/*/)",
+      "Bash(do echo \"=== $project ===\")",
+      "Bash(ls:*)",
+      "Bash(done)",
+      "Bash(python:*)",
+      "Bash(cat:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(pip install:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

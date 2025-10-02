@@ -1,45 +1,66 @@
 """
-Generic Training Script with Hydra Configuration.
+Main Training Script with Hydra Configuration.
 
-This script provides a reusable training pipeline that can be called
-from project-specific scripts with different configurations.
+This is the main entry point for training ML forecasting models.
+All configurations live in src/ml_portfolio/conf/
 
-DO NOT call this directly. Use project-specific train.py scripts instead.
+Usage:
+    # Run with default configuration
+    python src/ml_portfolio/training/train.py
 
-Example:
-    # From projects/retail_sales_walmart/scripts/train.py
-    from ml_portfolio.training.train import train_pipeline
-    train_pipeline(cfg)
+    # Override specific parameters
+    python src/ml_portfolio/training/train.py dataset_factory=walmart model=arima
+
+    # Multi-run experiments
+    python src/ml_portfolio/training/train.py -m model=random_forest,lstm,arima dataset_factory=walmart
+
+Example project-specific wrapper:
+    # projects/retail_sales_walmart/scripts/train.py
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
+
+    from ml_portfolio.training.train import main
+
+    if __name__ == "__main__":
+        main()
 """
 
 import logging
 import random
-from typing import Dict, Any
+import sys
 from pathlib import Path
-import numpy as np
 
 import hydra
+import numpy as np
 from omegaconf import DictConfig, OmegaConf
 
 from ml_portfolio.training.engine import TrainingEngine
 
+# Add src and project root to path for imports
+src_dir = Path(__file__).parent.parent.parent
+project_root = src_dir.parent
+sys.path.insert(0, str(src_dir))
+sys.path.insert(0, str(project_root))
+
 # Setup logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
+def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training") -> float:
     """
-    Generic training pipeline that can be called from any project.
+    Main training pipeline with Hydra configuration.
 
     Args:
-        cfg: Hydra configuration object
+        cfg: Hydra configuration object (automatically loaded from conf/)
         project_name: Name of the project for logging
 
     Returns:
         Primary metric value on test set (for Optuna optimization)
     """
     logger.info("=" * 60)
-    logger.info(f"{project_name} - Training Pipeline")
+    logger.info(f"{project_name}")
     logger.info("=" * 60)
 
     # Log configuration
@@ -51,36 +72,6 @@ def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
         np.random.seed(cfg.seed)
         random.seed(cfg.seed)
         logger.info(f"Random seed set to {cfg.seed}")
-
-    # ========================================================================
-    # 0. load default config and overide with project-specific config
-    # ========================================================================
-    # Store the original project config
-    project_cfg = cfg
-
-    # Load and resolve base configuration manually
-    base_config_dir = Path(__file__).parent.parent / "conf"
-    base_config_path = base_config_dir / "config.yaml"
-    base_cfg = OmegaConf.load(base_config_path)
-
-    # Manually resolve the defaults by loading each component config
-    if "defaults" in base_cfg:
-        defaults = base_cfg.defaults
-        for default in defaults:
-            if isinstance(default, str):
-                continue  # Skip _self_ and other special defaults
-            if isinstance(default, (dict, DictConfig)):
-                for key, value in default.items():
-                    if value and value != "null" and value is not None:  # Skip null values
-                        component_path = base_config_dir / key / f"{value}.yaml"
-                        if component_path.exists():
-                            component_cfg = OmegaConf.load(component_path)
-                            base_cfg[key] = component_cfg
-                            logger.info(f"Loaded {key}: {value}")
-
-    # Merge base config with project-specific config
-    cfg = OmegaConf.merge(base_cfg, project_cfg)
-    logger.info("Configuration successfully merged with base defaults")
 
     # ========================================================================
     # 1. Create datasets using factory pattern
@@ -207,4 +198,26 @@ def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
     test_metrics = engine.evaluate_test()
 
     # Return primary metric for optimization
-    return test_metrics.get(cfg.get("primary_metric", "mse"), 0.0)
+    primary_metric = cfg.metrics.get("primary_metric", "mse")
+    return test_metrics.get(primary_metric, 0.0)
+
+
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> float:
+    """
+    Main entry point for Hydra training.
+
+    This function is called when running:
+        python -m ml_portfolio.training.train
+
+    Args:
+        cfg: Hydra configuration from src/ml_portfolio/conf/
+
+    Returns:
+        Primary metric value for optimization
+    """
+    return train_pipeline(cfg)
+
+
+if __name__ == "__main__":
+    main()

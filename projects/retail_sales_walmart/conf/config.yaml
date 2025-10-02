@@ -1,7 +1,0 @@
-# Walmart Sales Forecasting Configuration
-# Project-specific configuration that inherits from src/ml_portfolio/conf/ defaults
-
-defaults:
-  - dataset_factory: walmart
-  - _self_
-

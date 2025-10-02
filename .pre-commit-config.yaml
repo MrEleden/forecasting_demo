@@ -1,0 +1,53 @@
+# Pre-commit hooks for ML Forecasting Portfolio
+# Install: pip install pre-commit && pre-commit install
+
+repos:
+  # Black - Python code formatter
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        language_version: python3.11
+        args: ['--line-length=120']
+
+  # Ruff - Fast Python linter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        args: ['--fix', '--exit-non-zero-on-fix']
+
+  # pycodestyle - PEP 8 style checker (via local)
+  - repo: local
+    hooks:
+      - id: pycodestyle
+        name: pycodestyle
+        entry: pycodestyle
+        language: system
+        types: [python]
+        args: ['--max-line-length=120', '--ignore=E203,W503']
+
+  # Trailing whitespace and file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ['--unsafe']  # Allow custom YAML tags for Hydra
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+
+  # pytest - Run tests before commit (optional, can be slow)
+  # Uncomment to enable:
+  # - repo: local
+  #   hooks:
+  #     - id: pytest-check
+  #       name: pytest
+  #       entry: pytest
+  #       language: system
+  #       pass_filenames: false
+  #       always_run: true
+  #       args: ['tests/', '-v']

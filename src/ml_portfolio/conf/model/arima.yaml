@@ -1,27 +1,14 @@
 # ARIMA model configuration (statsmodels)
-# Use with SimpleDataLoader and max_epochs=1
+# Use with dataloader=simple (shuffle=false) and training.max_epochs=1
 
 _target_: ml_portfolio.models.statistical.statistical.ARIMAWrapper
 
-# ARIMA parameters
+# ARIMA model parameters
 order: [1, 1, 1]  # (p, d, q) - autoregressive, differencing, moving average
 seasonal_order: [0, 0, 0, 0]  # (P, D, Q, s) - seasonal components
 
-# Fitting parameters
-method: lbfgs  # Optimization method
-maxiter: 50
-suppress_warnings: true
-
-# Dataloader configuration for statistical models
-dataloader:
-  _target_: ml_portfolio.data.loaders.SimpleDataLoader
-  shuffle: false  # Statistical models often prefer original order
-
-# Training configuration for statistical models
-training:
-  max_epochs: 1  # Statistical models fit once
-  early_stopping: false  # Not applicable for statistical models
-  patience: 10  # Not used but kept for compatibility
-  verbose: true
-  save_checkpoints: true
-  checkpoint_dir: models/checkpoints
+# Model structure parameters
+trend: null  # Trend component: 'n' (none), 'c' (constant), 't' (linear trend), 'ct' (both)
+enforce_stationarity: true  # Enforce stationarity of AR parameters
+enforce_invertibility: true  # Enforce invertibility of MA parameters
+concentrate_scale: false  # Concentrate scale parameter

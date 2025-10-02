@@ -1,380 +1,148 @@
-# Copilot Instructions for ML Portfolio - Forecasting Projects
+# Claude Code Guidelines - ML Forecasting Portfolio
 
-## Project Overview
-This is a professional ML portfolio showcasing time series forecasting across multiple domains. The architecture separates reusable forecasting components (`src/ml_portfolio/`) from self-contained project demonstrations (`projects/`). Primary showcase includes Walmart retail sales, ride-sharing demand (Ola Bike), inventory forecasting, and U.S. Transportation Services Index (TSI) with statistical (ARIMA, Prophet), deep learning (LSTM, TCN, Transformer), and hybrid approaches.
+## Overview
+Professional ML portfolio showcasing time series forecasting across multiple domains (retail, rideshare, inventory, transportation). Architecture separates reusable components (`src/ml_portfolio/`) from self-contained project demos (`projects/`).
 
-## Project Structure
-```
-ml-portfolio/
-├── README.md                      # Portfolio overview and navigation
-├── download_all_data.py           # Master data orchestration script
-├── validate_structure.py          # Project structure validator (CI enforced)
-├── docs/                          # Documentation and guides
-│   ├── README.md                  # Documentation index
-│   ├── DATA_DOWNLOAD_README.md    # Data setup guide
-│   ├── KAGGLE_SETUP.md           # Kaggle API configuration
-│   ├── DATASET_STATUS.md         # Current data status
-│   └── PROJECT_STRUCTURE.md      # Mandatory structure guide
-├── .github/
-│   ├── copilot-instructions.md   # This file - AI development guidelines
-│   └── workflows/
-│       └── validate-structure.yml # CI structure validation
-├── ci/                           # CI/CD infrastructure
-│   ├── README.md                 # CI/CD documentation
-│   ├── github-actions/           # GitHub Actions workflow templates
-│   │   └── validate-structure.yml # Project structure validation workflow
-│   ├── scripts/                  # CI/CD automation scripts
-│   │   └── validate_structure.py # Project structure validation script
-│   └── docker/                   # Docker configurations (future)
-├── src/
-│   └── ml_portfolio/             # Shared, importable forecasting library
-│       ├── data/
-│       │   ├── datasets.py       # PyTorch Dataset wrappers for time series
-│       │   ├── loaders.py        # DataLoader factories with time series sampling
-│       │   ├── transforms.py     # Scalers, encoders, feature engineering
-│       │   └── timeseries.py     # Windowing, lags, calendar features
-│       ├── models/
-│       │   ├── statistical/      # Traditional statistical forecasting models
-│       │   │   └── statistical.py# ARIMA, Prophet, Exponential Smoothing
-│       │   ├── deep_learning/    # Neural network-based forecasting models
-│       │   │   ├── lstm.py       # LSTM/Seq2Seq implementations
-│       │   │   ├── transformer.py# Informer/Transformer for long sequences
-│       │   │   └── tcn.py        # Temporal ConvNet
-│       │   ├── blocks/           # Reusable layers (TCN, attention mechanisms)
-│       │   ├── losses.py         # MSE/MAE/Quantile/Pinball/SMAPE for forecasting
-│       │   ├── metrics.py        # RMSE/MAE/MAPE + time series CV helpers
-│       │   ├── wrappers.py       # Scikit-learn compatible interfaces
-│       │   └── registry.py       # Model registry for loading/comparing models
-│       ├── training/
-│       │   ├── engine.py         # Train/validate loops with early stopping
-│       │   ├── callbacks.py      # Checkpoints, LR scheduling, monitoring
-│       │   └── utils.py          # Seed, device management, logging
-│       ├── evaluation/
-│       │   ├── backtesting.py    # Rolling origin evaluation, time series CV
-│       │   └── plots.py          # Learning curves, forecast visualization
-│       ├── pipelines/
-│       │   ├── classical.py      # Scikit-learn pipelines for preprocessing
-│       │   └── hybrid.py         # Sklearn preprocessing → PyTorch model
-│       └── utils/
-│           ├── io.py             # I/O, caching, data paths
-│           └── config.py         # Hydra/OMEGACONF configuration loading
-├── projects/                     # STANDARDIZED STRUCTURE (CI enforced)
-│   ├── retail_sales_walmart/     # SELF-CONTAINED: Walmart sales forecasting
-│   │   ├── README.md             # Project-specific documentation
-│   │   ├── api/                  # FastAPI endpoints
-│   │   ├── app/                  # Streamlit dashboard
-│   │   ├── conf/                 # Hydra configuration management
-│   │   │   ├── config.yaml       # Main project configuration
-│   │   │   ├── dataset/          # Dataset configurations
-│   │   │   ├── model/            # Model configurations
-│   │   │   ├── optimizer/        # Optimizer configurations
-│   │   │   ├── scheduler/        # LR scheduler configurations
-│   │   │   └── hydra/            # Hydra runtime settings
-│   │   ├── data/                 # DVC-style data layout
-│   │   │   ├── external/         # External/third-party data
-│   │   │   ├── interim/          # Intermediate processed data
-│   │   │   ├── processed/        # Final processed data
-│   │   │   └── raw/              # Raw unprocessed data (Walmart.csv)
-│   │   ├── models/               # Trained models and artifacts
-│   │   │   ├── artifacts/        # Model artifacts (scalers, encoders)
-│   │   │   └── checkpoints/      # Model checkpoints during training
-│   │   ├── notebooks/            # Jupyter notebooks for exploration
-│   │   ├── reports/              # Generated analysis reports
-│   │   │   └── figures/          # Generated plots and visualizations
-│   │   ├── scripts/              # Python scripts
-│   │   │   └── download_data.py  # Data acquisition script
-│   │   └── tests/                # Unit and integration tests
-│   ├── rideshare_demand_ola/     # SELF-CONTAINED: Same structure as above
-│   │   ├── README.md
-│   │   ├── scripts/
-│   │   │   └── generate_data.py  # Synthetic data generation
-│   │   └── [same folder structure as walmart]
-│   ├── inventory_forecasting/    # SELF-CONTAINED: Same structure as above
-│   │   ├── README.md
-│   │   ├── scripts/
-│   │   │   └── generate_data.py  # Synthetic data generation
-│   │   └── [same folder structure as walmart]
-│   └── transportation_tsi/       # SELF-CONTAINED: Same structure as above
-│       ├── README.md
-│       ├── scripts/
-│       │   └── download_data.py  # BTS API data download
-│       └── [same folder structure as walmart]
-```
+## Core Architecture
+- **Shared Library**: `src/ml_portfolio/` - Reusable forecasting components
+- **Self-Contained Projects**: `projects/*/` - Independent demonstrations with own data/configs
+- **Config Management**: Hydra for structured configs and experiment tracking
+- **Hyperparameter Tuning**: Optuna for automated optimization
+- **Model Registry**: Centralized loading/comparison for dashboards and APIs
 
-## Coding Standards and Guidelines
+## Coding Standards
 
-### Output and Formatting Rules
-- **Emoji Usage**: Use emoji ONLY in markdown (.md) files for documentation and README files
-- **Python Output**: NO emoji in Python print statements, debug messages, or logging output (ensures Windows terminal compatibility)
-- **ASCII Compatibility**: All Python script output must be ASCII-only for cross-platform compatibility
-- **Professional Standards**: Clean, readable output in all scripts and tools
-- **Non-Markdown Files**: ALL files except .md files must be emoji-free (includes .py, .yml, .yaml, .json, .txt, .sh, etc.)
+### Output Rules (STRICT)
+- ✅ Emoji ONLY in `.md` files
+- ❌ NO emoji in: Python code, comments, logs, output, commit messages, YAML, JSON, or any non-markdown files
+- ✅ ASCII-only output for cross-platform compatibility
 
 ### Code Quality
-- **Linting**: Use ruff for fast Python linting (replaces flake8)
-- **Formatting**: Black for consistent code formatting
-- **Type Hints**: Use type annotations for public APIs and complex functions
-- **Documentation**: Docstrings for all public functions and classes
+- **Style Guide**: PEP 8 (checked with pycodestyle)
+- **Formatting**: Black
+- **Type Hints**: For public APIs and complex functions
+- **Documentation**: Docstrings for all public functions/classes
 - **Testing**: pytest for unit and integration tests
 
-### File Structure Guidelines
-- **.gitkeep Files**: All empty folders contain .gitkeep files to maintain folder structure in Git (auto-created by validation script)
-- **Config Keys**: Consistent naming across all projects (model=..., dataset=..., optimizer=...)
-- **File Structure**: Follow standardized 22-folder structure enforced by validation script
-- **Module Names**: Use lowercase with underscores for Python modules
-- **Class Names**: PascalCase for class names, snake_case for function names
+### Naming Conventions
+- **Modules**: lowercase_with_underscores
+- **Classes**: PascalCase
+- **Functions**: snake_case
+- **Configs**: Consistent keys across projects (model=..., dataset=..., optimizer=...)
 
-## Dependency Management and Poetry
+## Project Structure
 
-### Poetry Project Structure
-This project uses **Poetry** for modern Python dependency management, providing reproducible builds, virtual environment management, and streamlined development workflows. Poetry replaces traditional `requirements.txt` files with structured `pyproject.toml` configuration.
+### Standardized Project Layout
+```
+projects/{project_name}/
+├── data/                   # raw/, interim/, processed/
+├── models/                 # artifacts/, checkpoints/
+├── scripts/                # download_data.py, generate_data.py
+├── notebooks/              # Exploration notebooks
+├── tests/                  # Unit tests
+├── api/                    # FastAPI endpoints (optional)
+└── app/                    # Streamlit dashboards (optional)
+```
 
-### Core Poetry Files
-- **`pyproject.toml`**: Main project configuration defining dependencies, build settings, and tool configurations
-- **`poetry.lock`**: Lock file ensuring exact dependency versions across environments (commit to Git)
+**Notes**:
+- `scripts/` is for data acquisition only (download/generate data)
+- Training scripts live in `src/ml_portfolio/training/`
+- Avoid project-specific `outputs/` or `docs/` - use root-level or git-ignore
 
-### Environment Setup Commands
+### Shared Library Structure
+```
+src/ml_portfolio/
+├── conf/                   # Hydra config templates
+├── data/                   # datasets.py, loaders.py, transforms.py, timeseries.py
+├── models/
+│   ├── statistical/        # ARIMA, Prophet
+│   ├── deep_learning/      # LSTM, TCN, Transformer
+│   ├── blocks/             # Reusable layers
+│   └── losses.py, metrics.py, registry.py
+├── training/               # engine.py, callbacks.py, train.py, utils.py
+├── evaluation/             # backtesting.py, plots.py
+├── pipelines/              # classical.py, hybrid.py
+└── utils/                  # config.py, io.py
+```
+
+## Development Patterns
+
+### Class Inheritance
+- Inherit from `src/ml_portfolio/` base classes
+- Override only for domain-specific customization (data loading, feature engineering)
+- Naming: `{ProjectName}{ModelType}` (e.g., `WalmartARIMAModel`, `OlaDemandLSTM`)
+
+### Hydra Configuration
+- Use `_target_:` for object instantiation
+- Configs stored in `src/ml_portfolio/conf/` (shared library)
+- Example structure:
+```yaml
+_target_: ml_portfolio.models.deep_learning.lstm.LSTMForecaster
+hidden_size: 128
+num_layers: 2
+```
+
+### Training Commands
 ```bash
-# Initial project setup
-curl -sSL https://install.python-poetry.org | python3 -  # Install Poetry
-poetry install                                            # Install base dependencies
-poetry install --extras "statistical deep_learning"      # Install with optional extras
-poetry install --with dev,train,app                      # Install with specific groups
+# Single run with config overrides
+python scripts/train.py model=lstm dataset=walmart optimizer=adam
 
-# Virtual environment management
-poetry shell                      # Activate Poetry virtual environment
-poetry env info                   # Show virtual environment information
-poetry env list                   # List available virtual environments
-poetry env remove <env-name>      # Remove virtual environment
+# Multi-run experiments
+python scripts/train.py -m model=lstm,tcn optimizer=adam,adamw
 
-# Dependency management
-poetry add pandas                 # Add runtime dependency
-poetry add --group dev pytest     # Add development dependency
-poetry add --group train optuna   # Add training dependency
-poetry add --optional statsmodels # Add optional dependency
-poetry show                       # Show installed packages
-poetry show --tree                # Show dependency tree
-poetry check                      # Verify consistency
-
-# Lock file and export
-poetry lock                       # Update lock file
-poetry export -f requirements.txt --output requirements.txt
-poetry export --with dev -f requirements.txt --output requirements-dev.txt
+# Hyperparameter optimization
+python scripts/optimize.py --config-path conf --config-name config
 ```
 
-### Docker Integration with Poetry
-```dockerfile
-# Multi-stage Docker build with Poetry
-FROM python:3.9-slim as builder
-COPY pyproject.toml poetry.lock ./
-RUN pip install poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --only=main --no-dev
+## Data Handling
+- **Time Series Windowing**: Use `ml_portfolio.data.datasets` for windowing
+- **Transforms**: Scalers, encoders in `transforms.py`
+- **Time Series Split**: Respect temporal order, use gap periods to prevent leakage
+- **Caching**: Use Parquet format for processed data
 
-FROM python:3.9-slim as runtime
-COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
-COPY src/ ./src/
-```
+## Model Implementation
+- **Base Classes**: Common interfaces in `models/wrappers.py` (sklearn compatible)
+- **Losses**: Quantile, Pinball, SMAPE in `losses.py`
+- **Metrics**: MAPE, RMSE, MAE, directional accuracy in `metrics.py`
+- **Training**: Use engine with callbacks, early stopping, checkpointing
+- **Registry**: Load models via `registry.load_model(name, version)`
 
-### Dependency Strategy and Guidelines
-- **Core Dependencies**: Keep minimal for maximum compatibility
-- **Optional Extras**: Group heavy dependencies (PyTorch, TensorFlow) as optional installs
-- **Version Pinning**: Use `^` for compatible updates, `>=` for minimum versions
-- **Group Separation**: Isolate dev, training, and app dependencies to reduce production bloat
-- **Regular Updates**: Use `poetry update` cautiously, test thoroughly
-- **Lock File Commits**: Always commit `poetry.lock` for reproducible builds
-- **Environment Isolation**: Never install packages outside Poetry in project environments
+## Evaluation Standards
+- **Dataset-Specific Primary Metrics**:
+  - Walmart: WMAE (Weighted Mean Absolute Error)
+  - Rideshare/Inventory: MAPE
+  - TSI/Economic: RMSE
+- **Universal Metrics**: MAPE, RMSE, MAE, directional accuracy
+- **Cross-Validation**: Time series split with configurable gap periods
+- **Visualization**: Residual analysis, forecast vs actual plots
 
-### Troubleshooting Common Issues
-```bash
-# Poetry installation issues
-curl -sSL https://install.python-poetry.org | python3 - --uninstall  # Reinstall
-poetry config virtualenvs.in-project true                           # Local .venv
+## Error Handling Guidelines
 
-# Dependency conflicts
-poetry lock --no-update          # Resolve without updating
-poetry install --no-dev          # Skip development dependencies
-poetry show --outdated           # Check for updates
+### File Operations
+- **Read Errors**: If file doesn't exist, check alternative paths or ask user for correct location
+- **Write Errors**: Verify directory exists before writing; create if missing
+- **Edit Errors**: If exact string match fails, show context and ask user to verify the code section
 
-# Virtual environment problems
-poetry env remove python         # Remove current environment
-poetry install                   # Recreate environment
-poetry cache clear pypi --all    # Clear package cache
-```
+### Code Errors
+- **Import Errors**: Check if module exists in `src/ml_portfolio/` structure before suggesting fixes
+- **Config Errors**: Verify Hydra config structure matches expected format
+- **Runtime Errors**: When encountering errors during execution, provide diagnostic info and suggest fixes
 
-## Architecture Principles
-- **Shared Library**: `src/ml_portfolio/` contains reusable forecasting components
-- **Self-Contained Projects**: Each `projects/*/` is independent with its own data, notebooks, configs
-- **Hydra Configuration**: Object instantiation and experiment management via structured configs
-- **Optuna Optimization**: Automated hyperparameter tuning with pruning and multi-objective support
-- **Consistent Naming**: Standardized config keys (model=..., dataset=...) across all projects
-- **Model Registry**: Centralized pattern for loading/comparing models in dashboards and APIs
-- **Reproducible Experiments**: Hydra configs for hyperparameters, data splits, model architecture
-- **Portfolio Showcase**: Multiple forecasting domains demonstrating versatility
-- **Production Ready**: FastAPI endpoints, Streamlit dashboards, CI/CD pipelines
-- **Time Series Focus**: Specialized components for windowing, backtesting, seasonal patterns
+### Recovery Actions
+1. **Check file existence** before reading/editing
+2. **Verify directory structure** matches expected layout
+3. **Validate config syntax** before suggesting Hydra commands
+4. **Test imports** in Python files match actual module structure
+5. **Ask for clarification** if multiple valid solutions exist
 
-## Data Handling Patterns
-- **PyTorch Datasets**: `ml_portfolio.data.datasets` for time series windowing and sampling
-- **Configurable Transforms**: Scalers, encoders, and feature engineering pipelines
-- **Calendar Features**: Holiday effects, seasonality, temporal encoding in `timeseries.py`
-- **Data Splits**: Time-aware train/validation/test splits respecting temporal order
-- **Caching**: Efficient I/O with parquet storage for interim/processed data
-- **DVC-style Layout**: `raw/` → `interim/` → `processed/` data progression per project
-
-## Model Implementation Conventions
-- **Abstract Base Classes**: Common interfaces in `models/wrappers.py` for sklearn compatibility
-- **Modular Architecture**: Reusable blocks (TCN, attention) in `models/blocks/`
-- **Loss Functions**: Forecasting-specific losses (Quantile, Pinball, SMAPE) in `losses.py`
-- **Training Engine**: DLwP-style train/validate loops with callbacks and early stopping
-- **Model Registry**: Checkpoints and artifacts storage with metadata tracking via `registry.py`
-- **Hybrid Pipelines**: Sklearn preprocessing feeding into PyTorch models
-- **Time Series Metrics**: MAPE, SMAPE, directional accuracy with temporal cross-validation
-- **Consistent Naming**: All models use same config keys across projects (model=lstm, model=arima)
-
-## Project-Specific Class Inheritance Pattern
-- **Inherit from Shared Library**: Project-specific classes MUST inherit from base classes in `src/ml_portfolio/`
-- **Extend, Don't Duplicate**: Override methods only when domain-specific customization is needed
-- **Maintain Compatibility**: Ensure project classes remain compatible with Hydra `_target_` instantiation
-- **Domain Specialization**: Add project-specific features (custom metrics, data transforms, model variants)
-- **Example Pattern**: `WalmartARIMAModel(ARIMAWrapper)` with Walmart-specific preprocessing
-- **Configuration Integration**: Project classes should accept same config structure as base classes
-- **Naming Convention**: Use `{ProjectName}{ModelType}` naming (e.g., `OlaDemandLSTM`, `InventoryProphet`)
-- **Import Strategy**: Always import from shared library, extend locally for project needs
-
-## Key Development Commands
-```bash
-# Environment setup
-poetry install                    # Install all dependencies and create virtual environment
-poetry shell                      # Activate virtual environment
-
-# Development dependencies
-poetry add --group dev pytest black ruff pre-commit
-poetry add --group train optuna mlflow hydra-core
-
-# Hydra-configured training (single run)
-poetry run python projects/retail_sales_walmart/scripts/train.py \
-    model=lstm dataset=walmart optimizer=adam
-
-# Optuna hyperparameter optimization
-poetry run python projects/retail_sales_walmart/scripts/optimize.py \
-    --config-path conf --config-name config \
-    hydra.sweep.dir=outputs/optuna_study
-
-# Multi-run experiments with Hydra sweeps
-poetry run python projects/retail_sales_walmart/scripts/train.py -m \
-    model=lstm,tcn,transformer \
-    optimizer=adam,adamw \
-    dataset.lookback_window=24,48,168
-
-# Hydra config overrides
-poetry run python scripts/train.py \
-    model.hidden_size=128 \
-    optimizer.lr=0.001 \
-    dataset.batch_size=64
-
-# Model evaluation and comparison
-poetry run python scripts/evaluate.py --study-name walmart_optimization
-
-# Dashboard with config selection
-poetry run streamlit run app/dashboard.py
-
-# Testing and code quality
-poetry run pytest tests/
-poetry run ruff check src/ tests/
-poetry run black src/ tests/
-
-# Docker deployment
-docker build -t forecasting-demo .
-docker run -p 8501:8501 -e DATASET=walmart forecasting-demo
-```
-
-## Model Evaluation Standards
-- **Primary Metric**: Dataset-specific primary metrics (WMAE for Walmart, MAPE for rideshare/inventory, RMSE for TSI/economic indicators)
-- **Universal Metrics**: MAPE, RMSE, MAE, directional accuracy across all datasets
-- **Cross-Validation**: Time series split with configurable gap periods per dataset
-- **Comparison Framework**: Statistical significance testing between models
-- **Visualization**: Residual analysis, forecast vs actual plots by entity/time period
-
-## Streamlit Dashboard Requirements
-- **Dataset Selector**: Dropdown to switch between available datasets
-- **Multi-Model Comparison**: Side-by-side forecast plots with confidence intervals
-- **Dynamic Filters**: Entity selection based on dataset (stores/depts, regions, products, pickup zones, TSI components)
-- **Performance Metrics**: Real-time metric display per model (dataset-appropriate)
-- **Data Exploration**: Time series visualization with trend/seasonality decomposition
-- **Model Insights**: Feature importance, residual analysis, forecast uncertainty
-
-## Docker Deployment Patterns
-- **Base Image**: `python:3.9-slim` for production efficiency
-- **Multi-Stage Build**: Separate stages for dependencies and application
-- **Environment Variables**: Model selection, data paths, dashboard configuration
-- **Health Checks**: Endpoint for model availability and data freshness validation
-- **Volume Mounts**: External data directory for dataset updates
-
-## Critical Dependencies
-```toml
-[tool.poetry.dependencies]
-python = "^3.9"
-
-# Core forecasting
-pandas = ">=1.5.0"
-numpy = ">=1.21.0"
-statsmodels = ">=0.13.0"      # ARIMA implementation
-prophet = ">=1.1.0"           # Prophet forecasting (formerly fbprophet)
-tensorflow = ">=2.8.0"        # LSTM and TFP-STS
-torch = ">=1.11.0"           # PyTorch LSTM and DeepAR
-gluonts = ">=0.11.0"         # DeepAR implementation
-
-# Dashboard and deployment
-streamlit = ">=1.15.0"
-plotly = ">=5.0.0"           # Interactive time series plots
-
-# Model evaluation and gradient boosting
-scikit-learn = ">=1.0.0"     # Metrics and preprocessing
-xgboost = ">=1.6.0"          # Gradient boosting for rideshare/inventory
-lightgbm = ">=3.3.0"         # Alternative gradient boosting
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.0.0"
-ruff = "^0.1.0"              # Fast Python linter (replaces flake8)
-black = "^22.0.0"
-pre-commit = "^3.0.0"
-jupyter = "^1.0.0"
-
-[tool.poetry.group.train.dependencies]
-optuna = "^3.4.0"            # Hyperparameter optimization
-mlflow = "^2.8.0"           # Experiment tracking (optional)
-hydra-core = "^1.3.0"       # Configuration management
-omegaconf = "^2.3.0"        # YAML/structured configs
-
-[tool.poetry.group.app.dependencies]
-fastapi = "^0.104.0"        # API endpoints
-uvicorn = "^0.24.0"         # ASGI server
-pydantic = "^2.4.0"         # Request/response validation
-```
-
-## Project-Specific Patterns
-- **Hydra Object Instantiation**: Use `_target_` to instantiate models, optimizers, datasets from configs
-- **Optuna Integration**: Multi-objective optimization with pruning for early stopping
-- **Config-Driven Experiments**: All hyperparameters, model architectures defined in YAML
-- **Reproducible Runs**: Hydra automatically logs configs, outputs, and random seeds
-- **Consistent Config Naming**: All projects use same keys (model=..., dataset=..., optimizer=...)
-- **Model Registry Usage**: Load models via registry for dashboards/APIs: `registry.load_model(name, version)`
-- **Time Series Schema**: Follow canonical schema in `docs/forecasting_framework.md`
-- **Loader Guidelines**: New datasets follow documented patterns for transforms and windowing
-- **Time Series Split**: Use `TimeSeriesSplit` with gap=4 weeks to prevent data leakage
-- **Model Persistence**: Save models with metadata (training period, hyperparameters, performance)
-- **Error Handling**: Graceful degradation when individual optimization trials fail
-- **Logging**: Track model training time, convergence, and prediction confidence levels
-
-## Structure Validation and Enforcement
-- **Automated Validation**: Run `python ci/scripts/validate_structure.py` to check all project structures
-- **CI/CD Integration**: GitHub Actions automatically validates structure on commits
-- **Structure Fixes**: Use `python ci/scripts/validate_structure.py --fix` to create missing folders
-- **Required Structure**: All projects must have identical 22-folder structure
-- **Enforcement**: CI pipeline fails if any project deviates from standard structure
-- **Documentation**: Project structure is enforced and documented in validation script
+## Best Practices
+- **Config-Driven**: All hyperparameters in YAML configs
+- **Reproducible**: Hydra logs configs, outputs, random seeds
+- **Time Series Aware**: Respect temporal order in splits/CV
+- **Model Persistence**: Save with metadata (training period, hyperparams, metrics)
+- **Error Handling**: Graceful degradation in optimization trials
+- **Consistent Naming**: Use same config keys across all projects
 
 ---
 
-*This file reflects the current ML portfolio forecasting implementation with validated project structure and professional coding standards. Update model-specific sections as new algorithms are added or performance benchmarks change.*
+*Claude Code guidelines for ML forecasting portfolio development.*
