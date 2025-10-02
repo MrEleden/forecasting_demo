@@ -4,14 +4,9 @@ Professional ML portfolio showcasing time series forecasting across multiple dom
 
 ## 🚀 Quick Start
 
-```bash
-# Clone and setup
-git clone <repository-url>
-cd forecasting_demo
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e .
+> **📚 Installation**: See [Installation Guide](docs/INSTALLATION.md) for detailed setup instructions.
 
+```bash
 # Run a model
 python src/ml_portfolio/training/train.py model=arima dataset_factory=walmart
 
@@ -100,10 +95,9 @@ Each run generates:
 
 ## 🔬 Development
 
-```bash
-# Install dev dependencies
-pip install -e ".[dev]"
+> **📚 Setup**: See [Installation Guide](docs/INSTALLATION.md) for environment setup.
 
+```bash
 # Run tests
 pytest
 
