@@ -1,161 +1,52 @@
 # Walmart Sales Forecasting Configuration
-# This config extends the base config from src/ml_portfolio/conf
-# and overrides with Walmart-specific settings
+# Simplified configuration for basic forecasting models
 
 defaults:
-  # Import base configs from src/ml_portfolio/conf
-  - /dataloader@_here_: simple  # From src/ml_portfolio/conf/dataloader/simple.yaml
-  - /model@_here_: random_forest  # From src/ml_portfolio/conf/model/random_forest.yaml
-  - /optimizer@_here_: null  # From src/ml_portfolio/conf/optimizer/
-  - /scheduler@_here_: null  # From src/ml_portfolio/conf/scheduler/
-  - /metrics@_here_: default  # From src/ml_portfolio/conf/metrics/default.yaml
-  
   # Import local Walmart dataset config
-  - dataset: walmart  # From ./dataset/walmart.yaml
-  
+  - dataset: walmart
   - _self_
 
-# Override training configuration for Walmart
-training:
-  max_epochs: 1  # 1 for sklearn models (RandomForest, ARIMA)
-  early_stopping: false
-  patience: 10
-  min_delta: 0.0001
-  monitor_metric: val_loss
-  verbose: true
-  random_seed: 42
+# Simple dataloader for sklearn models (no batching needed)
+dataloader:
+  _target_: ml_portfolio.data.loaders.SimpleDataLoader
+  batch_size: ${dataset.batch_size}
+  shuffle: false
 
-# Random seed for reproducibility
-seed: 42
-
-# Logging and output
-logging:
-  log_dir: outputs
-  experiment_name: walmart_experiment
-  save_checkpoints: true
-  checkpoint_dir: models/checkpoints
-
-# Hydra configuration
-hydra:
-  run:
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
-  sweep:
-    dir: outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    subdir: ${hydra.job.num}
-
-  save_checkpoints: true
-
-  checkpoint_dir: models/checkpointsprimary_metric: mape
-
-
-
-# Hydra configuration  - scheduler: cosine
-
-hydra:
-
-  run:# Metrics configuration
-
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
-
-  sweep:metrics:# Random seed for reproducibility  - _self_
-
-    dir: outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
-
-    subdir: ${hydra.job.num}  mape:
-
-
-    _target_: sklearn.metrics.mean_absolute_percentage_errorseed: 42
-
-  mae:
-
-    _target_: sklearn.metrics.mean_absolute_error# Project-specific dataset configuration
-
-  rmse:
-
-    _target_: ml_portfolio.models.metrics.root_mean_squared_error# Primary metric for optimization (used by Optuna/sweeps)dataset:
-
-  r2:
-
-    _target_: sklearn.metrics.r2_scoreprimary_metric: mape  data_path: data/raw/Walmart.csv
-
-
-
-# Training configuration  lookback_window: 52  # Weekly data, look back 1 year
-
-trainer:
-
-  max_epochs: 100# Metrics configuration  forecast_horizon: 12  # Forecast 12 weeks ahead (3 months)
-
-  patience: 10
-
-  min_delta: 0.001metrics:  batch_size: 64
-
-  verbose: true
-
-  save_checkpoints: true  mape:  
-
-  checkpoint_dir: models/checkpoints
-
-    _target_: sklearn.metrics.mean_absolute_percentage_error  # Walmart-specific features
-
-# Hydra runtime configuration
-
-hydra:  mae:  include_store_features: true
-
-  run:
-
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}    _target_: sklearn.metrics.mean_absolute_error  include_dept_features: true
-
-  sweep:
-
-    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}  rmse:  include_holiday_features: true
-
-    subdir: ${hydra.job.num}
-
-    _target_: ml_portfolio.models.metrics.root_mean_squared_error  
-
-  r2:  # Data splitting (temporal)
-
-    _target_: sklearn.metrics.r2_score  train_ratio: 0.7
-
-  validation_ratio: 0.15
-
-# Training configuration  test_ratio: 0.15
-
-trainer:  
-
-  max_epochs: 100  # Feature engineering
-
-  patience: 10  scale_features: true
-
-  min_delta: 0.001  scale_target: true
-
-  verbose: true  scaler_type: standard
-
-  save_checkpoints: true
-
-  checkpoint_dir: models/checkpoints# Model configuration (can be overridden via command line)
-
+# Model configuration (can be overridden via command line)
 model:
+  _target_: sklearn.ensemble.RandomForestRegressor
+  n_estimators: 100
+  max_depth: 10
+  min_samples_split: 5
+  min_samples_leaf: 2
+  random_state: 42
+  n_jobs: -1
 
-# Hydra runtime configuration  _target_: sklearn.ensemble.RandomForestRegressor
-
-hydra:  n_estimators: 200
-
-  run:  max_depth: 10
-
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}  min_samples_split: 5
-
-  sweep:  min_samples_leaf: 2
-
-    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}  random_state: 42
-
-    subdir: ${hydra.job.num}  n_jobs: -1
-
+# Dataset configuration
+dataset:
+  data_path: data/raw/Walmart.csv
+  lookback_window: 52  # Weekly data, look back 1 year
+  forecast_horizon: 12  # Forecast 12 weeks ahead (3 months)
+  batch_size: 64
+  
+  # Walmart-specific features
+  include_store_features: true
+  include_dept_features: true
+  include_holiday_features: true
+  
+  # Data splitting (temporal)
+  train_ratio: 0.7
+  validation_ratio: 0.15
+  test_ratio: 0.15
+  
+  # Feature engineering
+  scale_features: true
+  scale_target: true
+  scaler_type: standard
 
 # Training configuration
 trainer:
-  max_epochs: 1  # sklearn trains in one shot (override for deep learning models)
+  max_epochs: 1  # sklearn trains in one shot
   patience: 10
   early_stopping: false  # Not applicable for sklearn
   verbose: true
@@ -166,21 +57,17 @@ trainer:
 # Metrics configuration
 metrics:
   mae:
-    _target_: ml_portfolio.models.metrics.MAEMetric
-    name: mae
+    _target_: sklearn.metrics.mean_absolute_error
   rmse:
-    _target_: ml_portfolio.models.metrics.RMSEMetric
-    name: rmse
+    _target_: sklearn.metrics.mean_squared_error
+    squared: false
   mape:
-    _target_: ml_portfolio.models.metrics.MAPEMetric
-    name: mape
-    epsilon: 1e-8
-  wmape:
-    _target_: ml_portfolio.models.metrics.WMAPEMetric
-    name: wmape
+    _target_: sklearn.metrics.mean_absolute_percentage_error
+  r2:
+    _target_: sklearn.metrics.r2_score
 
 # Primary metric for optimization (Walmart-specific)
-primary_metric: wmape
+primary_metric: mape
 
 # Experiment settings
 experiment:
