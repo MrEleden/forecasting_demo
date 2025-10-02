@@ -13,7 +13,9 @@
       "Bash(echo $VIRTUAL_ENV)",
       "Bash(pip show:*)",
       "Bash(source:*)",
-      "Bash(pip check)"
+      "Bash(pip check)",
+      "Bash(nvidia-smi:*)",
+      "Bash(pip uninstall:*)"
     ],
     "deny": [],
     "ask": []

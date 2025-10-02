@@ -1,0 +1,36 @@
+# GPU-Accelerated Deep Learning Requirements
+# PyTorch with CUDA 12.1 support for NVIDIA GPUs
+#
+# PREREQUISITES:
+# - NVIDIA GPU with CUDA support (RTX 20/30/40 series, Tesla, A100, etc.)
+# - NVIDIA driver version >= 525.60.13 (for CUDA 12.1)
+# - Check with: nvidia-smi
+#
+# INSTALLATION:
+# 1. Install base ML dependencies first: pip install -r requirements-ml.txt
+# 2. Then install GPU version: pip install -r requirements-gpu.txt
+#
+# VERIFICATION:
+# python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
+#
+# PERFORMANCE:
+# - LSTM training: 2-3x faster than CPU
+# - Larger batch sizes possible with GPU memory
+# - Recommended batch_size: 64-128 for most GPUs
+#
+# TROUBLESHOOTING:
+# - If CUDA not detected, check driver version with nvidia-smi
+# - For CUDA 11.x drivers, use: --index-url https://download.pytorch.org/whl/cu118
+# - For CPU-only (no GPU), use: --index-url https://download.pytorch.org/whl/cpu
+
+# Uninstall CPU version first (will be replaced)
+# Run: pip uninstall torch torchvision torchaudio -y
+
+# PyTorch with CUDA 12.1 support
+--index-url https://download.pytorch.org/whl/cu121
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1
+
+# Note: These will replace the CPU versions from requirements-ml.txt
+# The versions must match for compatibility

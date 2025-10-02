@@ -51,13 +51,18 @@ ml-portfolio/
 git clone https://github.com/MrEleden/forecasting_demo.git
 cd forecasting_demo
 
-# Install dependencies (Poetry recommended)
-poetry install
-poetry shell
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Alternative: pip install
-pip install -r requirements/base.txt
+# Install ML dependencies
+pip install -r requirements-ml.txt
+
+# (Optional) GPU acceleration for 2-3x faster deep learning
+pip install -r requirements-gpu.txt  # Requires NVIDIA GPU
 ```
+
+**GPU Setup**: See [GPU Setup Guide](docs/SETUP.md#for-gpu-users-deep-learning-acceleration) for CUDA configuration
 
 ### **2. Download Datasets**
 ```bash

@@ -80,6 +80,15 @@ Development and testing tools:
 
 **When to use**: Development, contributing, testing, documentation
 
+### `requirements-gpu.txt` - GPU Acceleration (OPTIONAL)
+PyTorch with CUDA support for GPU-accelerated deep learning:
+- PyTorch with CUDA 12.1
+- torchvision with CUDA 12.1
+- torchaudio with CUDA 12.1
+
+**When to use**: Training LSTM/Transformer models on NVIDIA GPU (2-3x faster)
+**Requirements**: NVIDIA GPU with CUDA support (RTX 20/30/40 series, Tesla, etc.)
+
 ## Step-by-Step Installation
 
 ### For Users (Running Models)
@@ -122,6 +131,34 @@ black --check src/ tests/
 pycodestyle src/ tests/
 ```
 
+### For GPU Users (Deep Learning Acceleration)
+If you have an NVIDIA GPU and want 2-3x faster LSTM/Transformer training:
+
+```bash
+# 1. Check GPU availability
+nvidia-smi
+
+# 2. Clone and create environment
+git clone <repo-url>
+cd forecasting_demo
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# 3. Install ML dependencies (CPU version first)
+pip install -r requirements-ml.txt
+
+# 4. Install GPU-accelerated PyTorch
+pip install -r requirements-gpu.txt
+
+# 5. Verify GPU is detected
+python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+
+# 6. Test GPU training (should show "Training LSTM on device: cuda")
+python src/ml_portfolio/training/train.py dataset_factory=walmart model=lstm dataloader=pytorch training.max_epochs=2
+```
+
+**Expected output**: Training logs should show `Training LSTM on device: cuda`
+
 ## Troubleshooting
 
 ### Prophet Installation Issues
@@ -141,17 +178,35 @@ pip install prophet
 conda install -c conda-forge prophet
 ```
 
-### PyTorch Installation Issues
-For specific CUDA versions or CPU-only:
+### PyTorch/GPU Installation Issues
 
-**CPU-only (smaller download)**
+**GPU not detected after installation**
+```bash
+# Check NVIDIA driver
+nvidia-smi
+
+# Reinstall PyTorch with correct CUDA version
+pip uninstall torch torchvision torchaudio -y
+pip install -r requirements-gpu.txt
+
+# Verify CUDA is available
+python -c "import torch; print('CUDA:', torch.cuda.is_available())"
+```
+
+**CUDA version mismatch**
+The driver CUDA version (from `nvidia-smi`) should be >= PyTorch CUDA version (12.1).
+- Driver: 11.x → Use PyTorch CUDA 11.8: `--index-url https://download.pytorch.org/whl/cu118`
+- Driver: 12.x+ → Use PyTorch CUDA 12.1: `--index-url https://download.pytorch.org/whl/cu121`
+
+**CPU-only (no GPU / smaller download)**
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
-**CUDA 11.8**
+**Out of memory during GPU training**
+Reduce batch size in config:
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu118
+python src/ml_portfolio/training/train.py model=lstm dataloader.batch_size=32
 ```
 
 ### Windows-Specific Issues

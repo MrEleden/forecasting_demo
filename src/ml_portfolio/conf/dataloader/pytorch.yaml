@@ -5,9 +5,10 @@
 _target_: ml_portfolio.data.loaders.PyTorchDataLoader
 batch_size: 64
 shuffle: true
-num_workers: 0  # Set to 2-4 for multi-process loading (requires PyTorch)
-pin_memory: false  # Set true for GPU training
+num_workers: 2  # Multi-process data loading (2-4 recommended for GPU)
+pin_memory: true  # Pin memory for faster GPU transfer
 drop_last: false  # Whether to drop last incomplete batch
 
 # This loader yields multiple batches of size batch_size
 # Use with max_epochs > 1 for iterative training
+# pin_memory=true speeds up CPU->GPU data transfer
