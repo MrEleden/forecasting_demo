@@ -1,38 +1,19 @@
 # LSTM model configuration (PyTorch)
-# Use with PyTorchDataLoader and max_epochs>1
+# Use with dataloader=pytorch and training.max_epochs>1
+# Note: input_size will be automatically set from dataset n_features
 
 _target_: ml_portfolio.models.deep_learning.lstm.LSTMForecaster
 
 # Architecture
-input_size: 10  # Number of features
+input_size: 1  # Placeholder - will be overridden by dataset n_features
 hidden_size: 128
 num_layers: 2
 dropout: 0.2
-bidirectional: false
 
 # Output
 output_size: 1  # Forecast horizon
-forecast_horizon: 1
 
-# Training
-learning_rate: 0.001
-
-# Dataloader configuration for PyTorch models
-dataloader:
-  _target_: ml_portfolio.data.loaders.PyTorchDataLoader
-  batch_size: 64
-  shuffle: true
-  num_workers: 0
-  pin_memory: false
-  drop_last: false
-
-# Training configuration for PyTorch models
-training:
-  max_epochs: 100  # Iterative training for deep learning
-  early_stopping: true  # Enable early stopping
-  patience: 10  # Stop if no improvement for 10 epochs
-  min_delta: 0.0001  # Minimum improvement threshold
-  monitor_metric: val_loss  # Metric to monitor for early stopping
-  verbose: true
-  save_checkpoints: true
-  checkpoint_dir: models/checkpoints
+# Training parameters
+lr: 0.001
+epochs: 100
+batch_size: 64

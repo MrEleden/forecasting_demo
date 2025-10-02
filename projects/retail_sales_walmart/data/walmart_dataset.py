@@ -3,18 +3,19 @@ Walmart-specific dataset factory implementation.
 Creates train/val/test TimeSeriesDataset splits with Walmart-specific preprocessing.
 """
 
+import logging
 import sys
 from pathlib import Path
-import pandas as pd
-import numpy as np
 from typing import Optional, Tuple
-import logging
+
+import numpy as np
+import pandas as pd
 
 # Add src to path for imports
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from ml_portfolio.data.datasets import TimeSeriesDataset, DatasetFactory
+from ml_portfolio.data.datasets import DatasetFactory  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -141,11 +142,16 @@ class WalmartFactory(DatasetFactory):
 
         if not numeric_cols:
             # If no features, create time index
-            X = np.arange(len(df)).reshape(-1, 1)
+            X = np.arange(len(df)).reshape(-1, 1).astype(np.float32)
             feature_names = ["time_index"]
         else:
-            X = df[numeric_cols].values
+            # Force conversion to numeric, coercing errors to NaN, then convert to float32 for PyTorch
+            df_numeric = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
+            X = df_numeric.values.astype(np.float32)
             feature_names = numeric_cols
+
+        # Ensure y is also float32 for PyTorch compatibility
+        y = pd.to_numeric(y, errors="coerce").astype(np.float32)
 
         return X, y, feature_names
 

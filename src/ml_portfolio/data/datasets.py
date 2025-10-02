@@ -5,11 +5,11 @@ This module provides a flexible base class that child classes can inherit from
 to implement project-specific data loading, preprocessing, and feature engineering.
 """
 
+import logging
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from typing import Optional, Union, Tuple, List, Dict, Any
-import logging
 
 # Optional PyTorch imports
 try:
@@ -168,11 +168,16 @@ class TimeSeriesDataset:
 
             if not numeric_cols:
                 # If no features, create time index
-                X = np.arange(len(df)).reshape(-1, 1)
+                X = np.arange(len(df)).reshape(-1, 1).astype(np.float32)
                 feature_names = ["time_index"]
             else:
-                X = df[numeric_cols].values
+                # Force conversion to numeric, coercing errors to NaN
+                df_numeric = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
+                X = df_numeric.values.astype(np.float32)
                 feature_names = numeric_cols
+
+        # Ensure y is also float32 for PyTorch compatibility
+        y = pd.to_numeric(y, errors="coerce").astype(np.float32)
 
         return X, y, feature_names
 

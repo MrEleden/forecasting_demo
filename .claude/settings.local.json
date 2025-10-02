@@ -9,7 +9,11 @@
       "Bash(cat:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(echo $VIRTUAL_ENV)",
+      "Bash(pip show:*)",
+      "Bash(source:*)",
+      "Bash(pip check)"
     ],
     "deny": [],
     "ask": []

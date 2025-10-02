@@ -12,6 +12,14 @@ Professional ML portfolio showcasing time series forecasting across multiple dom
 
 ## Coding Standards
 
+### Virtual Environment (REQUIRED)
+- **ALWAYS use .venv**: All commands (pip, python, pytest, etc.) MUST run inside `.venv/`
+- **Check before executing**: Verify virtual environment is active before running any Python/pip commands
+- **Activation**:
+  - Windows: `.venv\Scripts\activate`
+  - Linux/Mac: `source .venv/bin/activate`
+- **Verification**: Check `$VIRTUAL_ENV` environment variable or `which python` output
+
 ### Output Rules (STRICT)
 - ✅ Emoji ONLY in `.md` files
 - ❌ NO emoji in: Python code, comments, logs, output, commit messages, YAML, JSON, or any non-markdown files
