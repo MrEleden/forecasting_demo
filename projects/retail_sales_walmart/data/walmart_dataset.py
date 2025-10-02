@@ -113,63 +113,6 @@ class WalmartFactory(DatasetFactory):
 
         logger.info(f"Initialized WalmartFactory with path: {data_path}")
 
-    def create_datasets(self) -> Tuple[TimeSeriesDataset, TimeSeriesDataset, TimeSeriesDataset]:
-        """
-        Create train, validation, and test datasets with Walmart-specific preprocessing.
-
-        Returns:
-            Tuple of (train_dataset, val_dataset, test_dataset)
-        """
-        logger.info(f"Walmart factory loading data from: {self.data_path}")
-
-        # Step 1: Load raw data
-        raw_data = self.load_data(self.data_path)
-        logger.info(f"Walmart factory loaded raw data: {raw_data.shape}")
-
-        # Step 2: Preprocess with Walmart-specific logic
-        processed_data = self.preprocess_data(raw_data)
-        logger.info(f"Walmart factory preprocessed data: {processed_data.shape}")
-
-        # Step 3: Extract features and targets
-        X, y, feature_names = self._extract_features_targets(processed_data)
-        logger.info(f"Walmart factory extracted features: {X.shape}, targets: {y.shape}")
-
-        # Step 4: Split data temporally (preserve chronological order)
-        n_samples = len(X)
-        train_end = int(n_samples * self.train_ratio)
-        val_end = int(n_samples * (self.train_ratio + self.validation_ratio))
-
-        X_train, y_train = X[:train_end], y[:train_end]
-        X_val, y_val = X[train_end:val_end], y[train_end:val_end]
-        X_test, y_test = X[val_end:], y[val_end:]
-
-        logger.info(f"Walmart factory splits: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}")
-
-        # Step 5: Create TimeSeriesDataset instances for each split
-        train_dataset = TimeSeriesDataset(data_path=self.data_path, target_column=self.target_column, **self.kwargs)
-        train_dataset.X = X_train
-        train_dataset.y = y_train
-        train_dataset.feature_names = feature_names
-        train_dataset.processed_data = processed_data
-
-        val_dataset = TimeSeriesDataset(data_path=self.data_path, target_column=self.target_column, **self.kwargs)
-        val_dataset.X = X_val
-        val_dataset.y = y_val
-        val_dataset.feature_names = feature_names
-        val_dataset.processed_data = processed_data
-
-        test_dataset = TimeSeriesDataset(data_path=self.data_path, target_column=self.target_column, **self.kwargs)
-        test_dataset.X = X_test
-        test_dataset.y = y_test
-        test_dataset.feature_names = feature_names
-        test_dataset.processed_data = processed_data
-
-        logger.info(
-            f"Created Walmart datasets - train: {len(train_dataset)}, val: {len(val_dataset)}, test: {len(test_dataset)}"
-        )
-
-        return train_dataset, val_dataset, test_dataset
-
     def _extract_features_targets(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, list]:
         """
         Extract feature matrix X and target vector y from preprocessed data.
@@ -181,12 +124,13 @@ class WalmartFactory(DatasetFactory):
             Tuple of (X, y, feature_names)
         """
         # Identify target column
-        if self.target_column not in df.columns:
-            raise ValueError(f"Target column '{self.target_column}' not found in data")
-        y = df[self.target_column].values
+        target_column = self.dataset_kwargs.get("target_column", "Weekly_Sales")
+        if target_column not in df.columns:
+            raise ValueError(f"Target column '{target_column}' not found in data")
+        y = df[target_column].values
 
         # Use all columns except target and non-numeric columns
-        exclude_cols = [self.target_column]
+        exclude_cols = [target_column]
         # Exclude date/time columns
         exclude_cols.extend([col for col in df.columns if "date" in col.lower() or "time" in col.lower()])
 
@@ -205,7 +149,7 @@ class WalmartFactory(DatasetFactory):
 
         return X, y, feature_names
 
-    def load_data(self, data_path: str) -> pd.DataFrame:
+    def _load_data(self) -> pd.DataFrame:
         """
         Load Walmart sales data from CSV.
 
@@ -215,12 +159,12 @@ class WalmartFactory(DatasetFactory):
         Returns:
             Raw Walmart data as DataFrame
         """
-        path = Path(data_path)
+        path = Path(self.data_path)
 
         # Handle relative paths from project root
         if not path.is_absolute():
             project_dir = Path(__file__).parent.parent.parent.parent
-            path = project_dir / data_path
+            path = project_dir / self.data_path
 
         # Check if file exists, otherwise generate synthetic data
         if not path.exists():
@@ -252,7 +196,7 @@ class WalmartFactory(DatasetFactory):
         logger.info(f"Loaded {len(df)} rows with columns: {df.columns.tolist()}")
         return df
 
-    def preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Walmart-specific preprocessing and feature engineering.
 
@@ -262,8 +206,18 @@ class WalmartFactory(DatasetFactory):
         Returns:
             Preprocessed DataFrame with engineered features
         """
-        # Call parent preprocessing first (handles missing values, sorting)
-        df = super().preprocess_data(df)
+        # Basic cleaning (copied from TimeSeriesDataset.preprocess_data)
+        df = df.copy()
+
+        # Handle missing values
+        if df.isnull().any().any():
+            logger.warning("Missing values detected. Filling with forward fill.")
+            df = df.fillna(method="ffill").fillna(method="bfill")
+
+        # Sort by time if date column exists
+        date_cols = [col for col in df.columns if "date" in col.lower() or "time" in col.lower()]
+        if date_cols:
+            df = df.sort_values(date_cols[0]).reset_index(drop=True)
 
         logger.info("Applying Walmart-specific preprocessing...")
 
@@ -315,10 +269,11 @@ class WalmartFactory(DatasetFactory):
                         df[f"{col}_normalized"] = (df[col] - mean) / std
 
         # Add lag features for target (useful for forecasting)
-        if self.target_column in df.columns:
-            df["sales_lag_1"] = df[self.target_column].shift(1)
-            df["sales_lag_4"] = df[self.target_column].shift(4)  # 4 weeks ago
-            df["sales_lag_52"] = df[self.target_column].shift(52)  # 1 year ago
+        target_column = self.dataset_kwargs.get("target_column", "Weekly_Sales")
+        if target_column in df.columns:
+            df["sales_lag_1"] = df[target_column].shift(1)
+            df["sales_lag_4"] = df[target_column].shift(4)  # 4 weeks ago
+            df["sales_lag_52"] = df[target_column].shift(52)  # 1 year ago
             logger.info("Added lag features: lag_1, lag_4, lag_52")
 
         # Fill NaN values created by lagging (from parent's fillna)

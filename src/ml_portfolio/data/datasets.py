@@ -56,7 +56,6 @@ class TimeSeriesDataset:
 
     def __init__(
         self,
-        data_path: Optional[str] = None,
         target_column: Optional[str] = None,
         feature_columns: Optional[List[str]] = None,
         **kwargs,
@@ -65,13 +64,12 @@ class TimeSeriesDataset:
         Initialize TimeSeriesDataset.
 
         Args:
-            data_path: Path to data file (used by factory for loading)
             target_column: Name of column to predict
             feature_columns: List of feature column names (None = all except target)
             **kwargs: Additional parameters for child classes
         """
         # Store configuration
-        self.data_path = data_path
+
         self.target_column = target_column
         self.feature_columns = feature_columns
         self.kwargs = kwargs
@@ -241,9 +239,8 @@ class MultiSeriesDataset(TimeSeriesDataset):
 
     Example:
         class WalmartMultiStoreDataset(MultiSeriesDataset):
-            def __init__(self, data_path: str, **kwargs):
+            def __init__(self, **kwargs):
                 super().__init__(
-                    data_path=data_path,
                     series_column='Store',
                     target_column='Weekly_Sales',
                     **kwargs
@@ -321,6 +318,7 @@ class DatasetFactory:
 
     def __init__(
         self,
+        data_path: str,
         dataset_class: str,
         train_ratio: float = 0.7,
         validation_ratio: float = 0.15,
@@ -337,7 +335,18 @@ class DatasetFactory:
             test_ratio: Test split ratio
             **dataset_kwargs: Additional arguments to pass to the dataset constructor
         """
-        self.dataset_class = dataset_class
+        # Dynamically import and resolve the dataset class
+        if isinstance(dataset_class, str):
+            # Import the class from string
+            module_path, class_name = dataset_class.rsplit(".", 1)
+            import importlib
+
+            module = importlib.import_module(module_path)
+            self.dataset_class = getattr(module, class_name)
+        else:
+            self.dataset_class = dataset_class
+
+        self.data_path = data_path
         self.train_ratio = train_ratio
         self.validation_ratio = validation_ratio
         self.test_ratio = test_ratio
@@ -349,34 +358,150 @@ class DatasetFactory:
 
     def create_datasets(self) -> Tuple[TimeSeriesDataset, TimeSeriesDataset, TimeSeriesDataset]:
         """
-        Create train/validation/test dataset splits.
+        Create train/validation/test dataset splits using the 5-step factory pattern.
 
-        **OVERRIDE THIS in child classes for domain-specific data loading and preprocessing.**
+        This method orchestrates the standard 5-step process:
+        1. Load raw data (_step1_load_data)
+        2. Preprocess data (_step2_preprocess_data)
+        3. Extract features and targets (_step3_extract_features_targets)
+        4. Split data temporally (_step4_split_data)
+        5. Create dataset instances (_step5_create_dataset_instances)
+
+        Child classes should override individual step methods as needed for domain-specific logic.
 
         Returns:
             Tuple of (train_dataset, val_dataset, test_dataset)
 
         Example:
             class WalmartFactory(DatasetFactory):
-                def create_datasets(self):
-                    # Load raw data
-                    df = self._load_raw_data()
+                def _step2_preprocess_data(self, raw_data):
+                    # Custom Walmart preprocessing
+                    return self.preprocess_walmart_data(raw_data)
 
-                    # Apply domain-specific preprocessing
-                    df = self._preprocess_walmart_data(df)
-
-                    # Create time-based splits
-                    train_df, val_df, test_df = self._split_data(df)
-
-                    # Instantiate dataset objects
-                    train_dataset = self._create_dataset_instance(train_df)
-                    val_dataset = self._create_dataset_instance(val_df)
-                    test_dataset = self._create_dataset_instance(test_df)
-
-                    return train_dataset, val_dataset, test_dataset
+                def _step4_split_data(self, X, y):
+                    # Custom time-based splitting for Walmart
+                    return self.walmart_temporal_split(X, y)
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement create_datasets() method. "
-            "This method should load data, apply preprocessing, create splits, "
-            "and return (train_dataset, val_dataset, test_dataset)."
+        # Step 1: Load raw data
+        raw_data = self._load_data()
+
+        # Step 2: Preprocess with domain-specific logic
+        processed_data = self._preprocess_data(raw_data)
+
+        # Step 3: Extract features and targets
+        X, y, feature_names = self._extract_features_targets(processed_data)
+
+        # Step 4: Split data temporally
+        X_train, y_train, X_val, y_val, X_test, y_test = self._split_data(X, y)
+
+        # Step 5: Create TimeSeriesDataset instances
+        train_dataset, val_dataset, test_dataset = self._create_dataset_instances(
+            X_train, y_train, X_val, y_val, X_test, y_test, feature_names, processed_data
         )
+
+        return train_dataset, val_dataset, test_dataset
+
+    def _load_data(self):
+        """
+        Step 1: Load raw data.
+
+        **OVERRIDE THIS in child classes for domain-specific data loading.**
+
+        Returns:
+            Raw data (typically pandas DataFrame)
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} must implement _load_data() method.")
+
+    def _preprocess_data(self, raw_data):
+        """
+        Step 2: Preprocess and engineer features.
+
+        **OVERRIDE THIS in child classes for domain-specific preprocessing.**
+
+        Args:
+            raw_data: Raw data from step 1
+
+        Returns:
+            Preprocessed data with engineered features
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} must implement _preprocess_data() method.")
+
+    def _extract_features_targets(self, processed_data):
+        """
+        Step 3: Extract feature matrix X and target vector y.
+
+        **OVERRIDE THIS in child classes for domain-specific feature extraction.**
+
+        Args:
+            processed_data: Preprocessed data from step 2
+
+        Returns:
+            Tuple of (X, y, feature_names)
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} must implement _extract_features_targets() method.")
+
+    def _split_data(self, X, y):
+        """
+        Step 4: Split data into train/validation/test sets.
+
+        Default implementation: Temporal split preserving chronological order.
+        Child classes can override this for domain-specific splitting logic.
+
+        Args:
+            X: Feature matrix from step 3
+            y: Target vector from step 3
+
+        Returns:
+            Tuple of (X_train, y_train, X_val, y_val, X_test, y_test)
+        """
+        n_samples = len(X)
+        train_end = int(n_samples * self.train_ratio)
+        val_end = int(n_samples * (self.train_ratio + self.validation_ratio))
+
+        X_train, y_train = X[:train_end], y[:train_end]
+        X_val, y_val = X[train_end:val_end], y[train_end:val_end]
+        X_test, y_test = X[val_end:], y[val_end:]
+
+        return X_train, y_train, X_val, y_val, X_test, y_test
+
+    def _create_dataset_instances(self, X_train, y_train, X_val, y_val, X_test, y_test, feature_names, processed_data):
+        """
+        Step 5: Create TimeSeriesDataset instances for each split.
+
+        Default implementation: Creates standard TimeSeriesDataset instances.
+        Child classes can override this for custom dataset instance creation.
+
+        Args:
+            X_train, y_train: Training data
+            X_val, y_val: Validation data
+            X_test, y_test: Test data
+            feature_names: List of feature names
+            processed_data: Original processed data
+
+        Returns:
+            Tuple of (train_dataset, val_dataset, test_dataset)
+        """
+        target_column = self.dataset_kwargs.get("target_column")
+
+        # Create train dataset
+        train_dataset = self.dataset_class(target_column=target_column)
+        train_dataset.X = X_train
+        train_dataset.y = y_train
+        train_dataset.feature_names = feature_names
+        train_dataset.processed_data = processed_data
+
+        # Create validation dataset
+        val_dataset = self.dataset_class(target_column=target_column)
+        val_dataset.X = X_val
+        val_dataset.y = y_val
+        val_dataset.feature_names = feature_names
+        val_dataset.processed_data = processed_data
+
+        # Create test dataset
+        test_dataset = self.dataset_class(target_column=target_column)
+        test_dataset.X = X_test
+        test_dataset.y = y_test
+        test_dataset.feature_names = feature_names
+        test_dataset.processed_data = processed_data
+
+        return train_dataset, val_dataset, test_dataset

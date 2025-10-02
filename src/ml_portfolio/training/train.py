@@ -85,10 +85,10 @@ def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
     # ========================================================================
     # 1. Create datasets using factory pattern
     # ========================================================================
-    logger.info(f"Creating dataset factory: {cfg.dataset._target_}")
+    logger.info(f"Creating dataset factory: {cfg.dataset_factory._target_}")
 
     # Create dataset factory and get the three dataset splits
-    dataset_factory = hydra.utils.instantiate(cfg.dataset)
+    dataset_factory = hydra.utils.instantiate(cfg.dataset_factory)
     train_dataset, val_dataset, test_dataset = dataset_factory.create_datasets()
 
     logger.info(f"Created datasets - train: {len(train_dataset)}, val: {len(val_dataset)}, test: {len(test_dataset)}")
