@@ -41,11 +41,17 @@ python -m pipx ensurepath
 #### Step 2: Install Poetry with pipx
 ```powershell
 # Install Poetry
-pipx install poetry
+python -m pipx install poetry
 
-# Verify installation
+# Verify installation (use pipx run if PATH not updated)
+python -m pipx run poetry --version
+# Should output: Poetry (version 2.2.1)
+
+# Alternative: Use poetry directly if PATH is updated
 poetry --version
 ```
+
+**Note**: After installation, you may need to restart your terminal for direct `poetry` command access. If `poetry` command is not found, use `python -m pipx run poetry` instead.
 
 ### Method 2: Official Installer (Alternative)
 
