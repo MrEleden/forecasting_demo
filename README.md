@@ -2,6 +2,10 @@
 
 Professional ML portfolio showcasing time series forecasting across multiple domains with modern MLOps practices.
 
+> **� Quick Commands**: See [`docs/HYDRA_OPTUNA_QUICK_SETUP.md`](docs/HYDRA_OPTUNA_QUICK_SETUP.md) for 5 tested working commands you can run immediately.
+
+> **�📚 Complete Documentation**: See [`docs/DOCUMENTATION_INDEX.md`](docs/DOCUMENTATION_INDEX.md) for comprehensive guides and tutorials.
+
 ## 🚀 Quick Start
 
 > **📚 Installation**: See [Setup Guide](docs/SETUP.md) for detailed environment setup and installation instructions.
@@ -58,15 +62,57 @@ python src/ml_portfolio/training/train.py -m model=arima,lstm,random_forest data
 
 ## 🛠️ Configuration Examples
 
-```yaml
+```bash
 # Single run
 python src/ml_portfolio/training/train.py model=lstm dataset_factory=walmart optimizer=adam
 
-# Hyperparameter sweep
+# Hyperparameter sweep (grid search)
 python src/ml_portfolio/training/train.py -m model=lstm dataset_factory=walmart optimizer=adam,adamw optimizer.lr=0.001,0.01,0.1
+
+# Optuna optimization
+python src/ml_portfolio/training/train.py experiment=lstm_sweep
+
+# Model comparison
+python src/ml_portfolio/training/train.py experiment=model_comparison model=arima,random_forest,lstm
 ```
 
-## 📦 MLflow Integration
+## 🔄 Hyperparameter Optimization
+
+**Comprehensive sweep capabilities** with Optuna integration:
+
+- **📈 Statistical Models**: ARIMA order selection, Prophet seasonality tuning
+- **🌳 ML Models**: Random Forest, XGBoost with regularization optimization
+- **🧠 Deep Learning**: LSTM, TCN, Transformer architecture search
+- **🎯 Multi-Objective**: Accuracy vs efficiency trade-offs
+- **⚡ Advanced Features**: Pruning, persistent studies, distributed execution
+
+```bash
+# Quick start with pre-configured experiments
+python src/ml_portfolio/training/train.py experiment=lstm_sweep          # 60 trials
+python src/ml_portfolio/training/train.py experiment=random_forest_sweep # 50 trials
+python src/ml_portfolio/training/train.py experiment=walmart_optimization # Dataset-specific
+
+# See full documentation
+# docs/HYPERPARAMETER_SWEEPS.md - Comprehensive guide
+# docs/SWEEP_COMMANDS.md - Ready-to-use commands
+```
+
+## � Configuration Management
+
+- **Hydra Framework**: Structured, modular configuration system
+- **Config Composition**: Combine model, dataset, optimizer configs
+- **Runtime Overrides**: Modify parameters via command line
+- **Grid Search**: Built-in hyperparameter optimization with multirun
+
+```bash
+# Configuration examples
+python src/ml_portfolio/training/train.py model=lstm optimizer.lr=0.01
+python src/ml_portfolio/training/train.py -m 'model.hidden_size=64,128,256'
+
+# See full documentation: docs/HYDRA_CONFIGURATION.md
+```
+
+## �📦 MLflow Integration
 
 - **Automatic Tracking**: Parameters, metrics, artifacts
 - **Model Registry**: Versioned model storage

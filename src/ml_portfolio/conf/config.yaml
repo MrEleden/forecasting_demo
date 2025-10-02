@@ -10,6 +10,7 @@ defaults:
   - scheduler: null  # LR scheduler for deep learning (step_lr, cosine, plateau)
   - metrics: default
   - mlflow: default  # MLflow experiment tracking configuration
+  - experiment: null  # Optional experiment configuration
   - _self_
 
 # Optimizer and scheduler are optional (only for PyTorch models)

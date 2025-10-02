@@ -106,14 +106,13 @@ def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training")
     logger.info("Configuration:")
     logger.info(OmegaConf.to_yaml(cfg))
 
-    # Detect if running in multirun/sweep mode
-    try:
-        from hydra.core.hydra_config import HydraConfig
-
-        hydra_cfg = HydraConfig.get()
-        is_multirun = hydra_cfg.mode.name == "MULTIRUN"
-    except Exception:
-        is_multirun = False
+    # Detect if running in multirun/sweep mode using hydra config in cfg
+    is_multirun = False
+    if hasattr(cfg, "hydra") and hasattr(cfg.hydra, "mode"):
+        is_multirun = cfg.hydra.mode == "MULTIRUN"
+    elif hasattr(cfg, "hydra") and hasattr(cfg.hydra, "job") and hasattr(cfg.hydra.job, "num"):
+        # Alternative: check if job number exists (indicates multirun)
+        is_multirun = cfg.hydra.job.num is not None
 
     # Initialize MLflow tracking
     mlflow_tracker = None
@@ -332,6 +331,15 @@ def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training")
         # 9. Evaluate on test set and log to MLflow
         # ========================================================================
         test_metrics = engine.evaluate_test()
+
+        # Log test metrics to MLflow
+        if mlflow_tracker:
+            try:
+                # Log test metrics with 'test_' prefix to distinguish from training/validation
+                mlflow_tracker.log_metrics(test_metrics)
+                logger.info(f"Logged test metrics to MLflow: {test_metrics}")
+            except Exception as e:
+                logger.warning(f"Failed to log test metrics to MLflow: {e}")
 
         # Log model to MLflow
         if mlflow_tracker and mlflow_tracker.cfg.log_model:
