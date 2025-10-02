@@ -1,0 +1,60 @@
+# M5-Inspired Walmart Forecasting Configuration
+# Competition-winning strategies adapted for Walmart sales data
+
+defaults:
+  - _self_
+  - model: walmart_ensemble    # Default to full M5 ensemble
+  - dataset: walmart
+  - optimizer: adam
+
+# Model variants available
+model_options:
+  - walmart_ensemble      # Full 6-model ensemble (winner's approach)
+  - per_series           # Individual (Store, Dept) modeling
+  - svd_stlf             # Best single model: SVD + STLF/ETS
+  - fourier_arima        # Pivotal component: Fourier + ARIMA
+  - classical_ensemble   # Robust trio: ARIMA + ETS + naive
+  - pure_ets             # Standalone exponential smoothing
+  - seasonal_naive       # Enhanced baseline with calendar adjustments
+
+# Training parameters
+training:
+  test_horizon: 52         # Forecast 1 year (52 weeks)
+  validation_horizon: 52   # Validate on 1 year
+  min_train_periods: 104   # Minimum 2 years for model fitting
+  cv_folds: 3             # Time series cross-validation folds
+
+# Evaluation metrics (M5 competition focused on WMAE)
+metrics:
+  primary: "wmae"         # Weighted Mean Absolute Error (M5 official metric)
+  secondary:
+    - "mase"              # Mean Absolute Scaled Error
+    - "mape"              # Mean Absolute Percentage Error
+    - "rmse"              # Root Mean Square Error
+    - "smape"             # Symmetric MAPE
+
+# Data processing
+data:
+  aggregation_level: "store_dept"  # (Store, Dept) or "total"
+  calendar_features: true          # Add holiday/calendar features
+  price_features: true             # Include price/markdown features
+  apply_log_transform: false       # Log transform for sales
+
+# Post-processing
+post_processing:
+  apply_calendar_shifts: true      # Christmas/Thanksgiving adjustments
+  clip_negative_forecasts: true    # Ensure non-negative sales
+  apply_trend_damping: false       # Dampen unrealistic trends
+
+# Ensemble configuration
+ensemble:
+  method: "equal_weight"           # equal_weight or cv_weighted
+  enable_model_selection: false   # Dynamic model selection per series
+  fallback_model: "seasonal_naive" # Fallback for failed models
+
+# Hydra configuration
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    name: walmart_m5_forecasting

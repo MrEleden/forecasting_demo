@@ -1,0 +1,21 @@
+# STL + ARIMA Forecasting Model
+# STL decomposition followed by ARIMA on seasonally adjusted series
+
+_target_: ml_portfolio.models.statistical.stlf_arima.STLFARIMAForecaster
+
+# STL parameters
+seasonal_period: 52                   # Seasonal period
+stl_seasonal: 52                      # STL seasonal smoothing parameter
+
+# ARIMA parameters
+arima_order: [1, 1, 1]               # ARIMA order (p, d, q) if not auto
+auto_arima: true                      # Automatically select ARIMA order
+
+# Seasonal forecasting
+seasonal_forecast_method: "naive"     # How to forecast seasonal component (naive/drift)
+
+# Model metadata (comments only - not passed to constructor)
+# name: "stlf_arima"
+# description: "STL decomposition + ARIMA on seasonally adjusted series"
+# citation: "Strong base component used in M5 competition approaches"
+# workflow: "Decompose → Forecast trend/residual with ARIMA → Add back seasonality"

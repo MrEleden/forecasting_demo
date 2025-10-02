@@ -1,0 +1,22 @@
+# Fourier + ARIMA (Dynamic Harmonic Regression)
+# ARIMA on seasonal regressors built from Fourier terms
+
+_target_: ml_portfolio.models.statistical.walmart_ensemble.WalmartEnsembleForecaster
+
+# Focus on Fourier-based harmonic regression
+models:
+  - fourier_arima    # Primary model: Fourier terms + ARIMA
+  - seasonal_naive   # Strong baseline for comparison
+
+# Fourier parameters
+fourier_terms: 8       # More Fourier terms for complex seasonality
+seasonal_period: 52
+
+# ARIMA will be auto-selected within the fourier_arima method
+ensemble_method: "equal_weight"
+enable_calendar_adjustment: true
+
+# Model metadata
+name: "fourier_arima_forecaster"
+description: "Dynamic Harmonic Regression with Fourier terms + ARIMA"
+citation: "Pivotal component in M5 winning blend - fourier.arima approach"

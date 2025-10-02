@@ -1,0 +1,24 @@
+# Exponential Smoothing (ETS) Model
+# Pure Holt-Winters family exponential smoothing
+
+_target_: ml_portfolio.models.statistical.ets.ETSForecaster
+
+# Core parameters
+seasonal_period: 52                    # Weekly seasonality
+
+# ETS configuration
+trend: null                           # Auto-select trend type (add/mul/none)
+seasonal: null                        # Auto-select seasonal type (add/mul/none)
+damped_trend: false                   # Whether to use damped trend
+auto_select: true                     # Automatically select best ETS configuration
+
+# Smoothing parameters (null = auto-optimize)
+smoothing_level: null                 # Alpha - level smoothing (0-1)
+smoothing_trend: null                 # Beta - trend smoothing (0-1)
+smoothing_seasonal: null              # Gamma - seasonal smoothing (0-1)
+
+# Model metadata (comments only - not passed to constructor)
+# name: "pure_ets"
+# description: "Pure exponential smoothing with automatic configuration selection"
+# citation: "Holt-Winters family models as standalone components from M5 winners"
+# variants: "Supports Simple/Holt/Holt-Winters with Add/Multiplicative components"

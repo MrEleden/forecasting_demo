@@ -1,0 +1,16 @@
+# Per-Series Forecasting for (Store, Department) combinations
+# Individual models fitted to each store-department time series
+
+_target_: ml_portfolio.models.statistical.walmart_ensemble.PerSeriesForecaster
+
+# Model type selection
+model_type: "ensemble"  # Options: ensemble, arima, ets, seasonal_naive
+
+# Time series parameters
+seasonal_period: 52      # Weekly seasonality
+min_series_length: 104   # Minimum 2 years of data to fit models
+
+# Model metadata
+name: "per_series_forecaster"
+description: "Individual forecasting models for each (Store, Dept) combination"
+use_case: "Granular store-department level forecasting"

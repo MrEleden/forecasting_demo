@@ -1,0 +1,18 @@
+# Fourier + ARIMA Model (Dynamic Harmonic Regression)
+# ARIMA with Fourier terms as exogenous regressors
+
+_target_: ml_portfolio.models.statistical.fourier_arima.FourierARIMAForecaster
+
+# Fourier parameters
+seasonal_period: 52                   # Seasonal period for Fourier terms
+fourier_terms: 6                      # Number of Fourier term pairs (sin/cos)
+
+# ARIMA parameters
+arima_order: [1, 1, 1]               # ARIMA order (p, d, q) if not auto
+auto_arima: true                      # Automatically select ARIMA order
+
+# Model metadata (comments only - not passed to constructor)
+# name: "fourier_arima"
+# description: "Dynamic Harmonic Regression - ARIMA with Fourier seasonal regressors"
+# citation: "Pivotal component in M5 winning blend - fourier.arima approach"
+# advantages: "Captures complex seasonal patterns with harmonic components"

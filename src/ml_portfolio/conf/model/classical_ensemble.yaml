@@ -1,0 +1,24 @@
+# Classical Ensemble: ARIMA + ETS + Seasonal Naive
+# Simple averaging of robust classical time series methods
+
+_target_: ml_portfolio.models.statistical.walmart_ensemble.WalmartEnsembleForecaster
+
+# Classical time series trio
+models:
+  - auto_arima       # Classic auto.arima fitted per series
+  - ets             # Exponential smoothing variants
+  - seasonal_naive  # Year-ago same week baseline
+
+# Standard parameters
+seasonal_period: 52
+ensemble_method: "equal_weight"
+enable_calendar_adjustment: true
+
+# Reduced complexity for classical methods
+n_svd_components: 5
+fourier_terms: 4
+
+# Model metadata
+name: "classical_ensemble"
+description: "Equal-weight classical blend: ARIMA + ETS + seasonal naive"
+citation: "Robust recipe reported by high-ranked M5 teams"

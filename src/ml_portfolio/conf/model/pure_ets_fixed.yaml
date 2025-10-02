@@ -1,0 +1,14 @@
+# Pure ETS (Exponential Smoothing)
+# Holt-Winters family models as standalone components
+
+_target_: ml_portfolio.models.statistical.ets.ETSForecaster
+
+# ETS will auto-select best configuration (Add/Mult trends/seasonality)
+seasonal_period: 52
+auto_select: true  # Automatically select best ETS configuration
+damped_trend: true  # Allow damped trend components
+
+# Model metadata
+# name: "pure_ets"
+# description: "Pure Exponential Smoothing (Holt-Winters family) forecaster"
+# citation: "Strong standalone component shared by top M5 competitors"

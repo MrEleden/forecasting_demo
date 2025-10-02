@@ -1,0 +1,18 @@
+# SVD + STLF Forecasting Model
+# Cross-series SVD with STL decomposition and forecasting
+
+_target_: ml_portfolio.models.statistical.svd_models.SVDSTLFForecaster
+
+# SVD parameters
+n_components: 15                      # Number of SVD components
+seasonal_period: 52                   # Seasonal period
+
+# STL parameters
+stl_seasonal: 52                      # STL seasonal parameter
+forecast_method: "ets"                # Method for forecasting components (ets/arima)
+
+# Model metadata (comments only - not passed to constructor)
+# name: "svd_stlf"
+# description: "SVD + STL decomposition with ETS/ARIMA forecasting"
+# citation: "M5 winner's best single model - SVD + STLF/ETS combination"
+# advantages: "Combines cross-series learning with robust seasonal decomposition"

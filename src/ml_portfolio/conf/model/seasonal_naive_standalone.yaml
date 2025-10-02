@@ -1,0 +1,18 @@
+# Seasonal Naive Forecasting Model
+# Enhanced year-ago same week baseline with calendar adjustments
+
+_target_: ml_portfolio.models.statistical.seasonal_naive.SeasonalNaiveForecaster
+
+# Core parameters
+seasonal_period: 52                    # Weekly seasonality (52 weeks)
+
+# Enhancement features
+enable_calendar_adjustment: true       # Apply Christmas/Thanksgiving adjustments
+enable_trend_adjustment: false        # Apply simple trend corrections
+fallback_periods: 2                   # Fallback periods if insufficient history
+
+# Model metadata (comments only - not passed to constructor)
+# name: "seasonal_naive"
+# description: "Year-ago same week forecasting with calendar adjustments"
+# citation: "M5 3rd place: seasonal naive with week-blending and trend tweaks"
+# use_case: "Strong baseline, remarkably competitive against complex methods"
