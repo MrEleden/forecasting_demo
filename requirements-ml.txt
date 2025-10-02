@@ -1,0 +1,18 @@
+# Include all core dependencies
+-r requirements.txt
+
+# Statistical forecasting
+statsmodels>=0.14.0
+scipy>=1.11.0
+
+# Machine learning
+xgboost>=1.7.0
+lightgbm>=4.0.0
+catboost>=1.2.0
+optuna>=2.10.0,<3.0.0
+
+# Deep learning (optional - comment out if not needed)
+torch>=2.0.0
+
+# Prophet forecasting (can be problematic on some systems)
+prophet>=1.1.4  

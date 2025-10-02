@@ -1,0 +1,25 @@
+# Include all core dependencies
+-r requirements.txt
+
+# Statistical forecasting
+statsmodels>=0.14.0
+scipy>=1.11.0
+
+# Machine learning (Windows-safe versions)
+xgboost>=1.7.0
+lightgbm>=4.0.0
+catboost>=1.2.0
+optuna>=2.10.0,<3.0.0
+
+# Deep learning - Windows compatible
+# PyTorch (generally more Windows-friendly)
+# torch>=2.0.0
+# torchvision>=0.15.0
+
+# TensorFlow alternatives for Windows:
+# tensorflow-cpu>=2.13.0  # CPU-only version (more reliable on Windows)
+# tf-nightly              # Nightly builds sometimes work better
+
+# Prophet alternatives (often problematic on Windows)
+# sktime>=0.24.0          # Alternative forecasting library
+# neuralprophet>=0.5.0    # PyTorch-based Prophet alternative
