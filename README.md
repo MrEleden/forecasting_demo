@@ -4,7 +4,7 @@ Professional ML portfolio showcasing time series forecasting across multiple dom
 
 ## 🚀 Quick Start
 
-> **📚 Installation**: See [Installation Guide](docs/INSTALLATION.md) for detailed setup instructions.
+> **📚 Installation**: See [Setup Guide](docs/SETUP.md) for detailed environment setup and installation instructions.
 
 ```bash
 # Run a model
@@ -95,7 +95,7 @@ Each run generates:
 
 ## 🔬 Development
 
-> **📚 Setup**: See [Installation Guide](docs/INSTALLATION.md) for environment setup.
+> **📚 Setup**: See [Setup Guide](docs/SETUP.md) for development environment setup and requirements.
 
 ```bash
 # Run tests
