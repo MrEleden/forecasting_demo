@@ -60,17 +60,10 @@ python src/ml_portfolio/training/train.py -m model=arima,lstm,random_forest data
 
 ```yaml
 # Single run
-python src/ml_portfolio/training/train.py \
-  model=lstm \
-  dataset_factory=walmart \
-  optimizer=adam \
-  mlflow=production
+python src/ml_portfolio/training/train.py model=lstm dataset_factory=walmart optimizer=adam mlflow=production
 
 # Hyperparameter sweep
-python src/ml_portfolio/training/train.py -m \
-  model=lstm \
-  optimizer=adam,adamw \
-  optimizer.lr=0.001,0.01,0.1
+python src/ml_portfolio/training/train.py -m model=lstm optimizer=adam,adamw optimizer.lr=0.001,0.01,0.1
 ```
 
 ## 📦 MLflow Integration
