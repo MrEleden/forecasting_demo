@@ -6,9 +6,10 @@ implementing .fit() and .predict() methods. It handles training loops,
 validation, metrics computation, and testing.
 """
 
-import time
 import logging
-from typing import Optional, Dict, Any
+import time
+from typing import Any, Dict, Optional
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ class TrainingEngine:
         verbose: bool = True,
         monitor_metric: str = "val_loss",
         min_delta: float = 1e-4,
+        mlflow_tracker=None,
     ):
         """
         Initialize TrainingEngine.
@@ -74,6 +76,7 @@ class TrainingEngine:
             verbose: Whether to log training progress
             monitor_metric: Metric to monitor for early stopping
             min_delta: Minimum improvement threshold for early stopping
+            mlflow_tracker: MLflow tracker for experiment logging (optional)
         """
         self.model = model
         self.metrics = metrics or {}
@@ -82,6 +85,7 @@ class TrainingEngine:
         self.test_dataset = test_dataset
         self.optimizer = optimizer
         self.scheduler = scheduler
+        self.mlflow_tracker = mlflow_tracker
 
         # Training parameters (now passed directly)
         self.max_epochs = max_epochs
@@ -300,6 +304,25 @@ class TrainingEngine:
         for metric_name, value in val_metrics.items():
             logger.info(f"  {metric_name}: {value:.4f}")
 
+        # Log metrics to MLflow
+        if self.mlflow_tracker:
+            try:
+                # Combine all metrics with prefixes
+                mlflow_metrics = {}
+                for metric_name, value in train_metrics.items():
+                    mlflow_metrics[f"train_{metric_name}"] = value
+                for metric_name, value in val_metrics.items():
+                    mlflow_metrics[f"val_{metric_name}"] = value
+
+                # Add epoch time
+                mlflow_metrics["epoch_time"] = epoch_time
+
+                # Log to MLflow with step
+                self.mlflow_tracker.log_metrics(mlflow_metrics, step=epoch)
+
+            except Exception as e:
+                logger.warning(f"Failed to log metrics to MLflow: {e}")
+
     def evaluate_test(self) -> Dict[str, float]:
         """
         Evaluate model on test dataset.
@@ -319,6 +342,36 @@ class TrainingEngine:
             logger.info("Test Results:")
             for metric_name, value in sorted(test_metrics.items()):
                 logger.info(f"  {metric_name}: {value:.4f}")
+
+        # Log test metrics to MLflow
+        if self.mlflow_tracker:
+            try:
+                self.mlflow_tracker.log_metrics(test_metrics)
+
+                # Log predictions if configured
+                if self.mlflow_tracker.cfg.log_predictions:
+                    # Get predictions and true values
+                    y_pred = self.predict(self.test_dataset)
+                    y_true = []
+                    for X_batch, y_batch in self.test_dataset:
+                        if hasattr(y_batch, "numpy"):
+                            y_true.extend(y_batch.numpy().flatten())
+                        else:
+                            y_true.extend(y_batch.flatten() if hasattr(y_batch, "flatten") else y_batch)
+
+                    y_true = np.array(y_true)
+                    y_pred = y_pred.flatten() if hasattr(y_pred, "flatten") else y_pred
+
+                    # Ensure same length
+                    min_len = min(len(y_true), len(y_pred))
+                    y_true = y_true[:min_len]
+                    y_pred = y_pred[:min_len]
+
+                    # Log predictions with plots
+                    self.mlflow_tracker.log_predictions(y_true, y_pred, "test", plot=True)
+
+            except Exception as e:
+                logger.warning(f"Failed to log test results to MLflow: {e}")
 
         return test_metrics
 

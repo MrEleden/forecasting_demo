@@ -1,5 +1,5 @@
 """
-Main Training Script with Hydra Configuration.
+Main Training Script with Hydra Configuration and MLflow Tracking.
 
 This is the main entry point for training ML forecasting models.
 All configurations live in src/ml_portfolio/conf/
@@ -13,6 +13,9 @@ Usage:
 
     # Multi-run experiments
     python src/ml_portfolio/training/train.py -m model=random_forest,lstm,arima dataset_factory=walmart
+
+    # Use different MLflow configuration
+    python src/ml_portfolio/training/train.py mlflow=production
 
 Example project-specific wrapper:
     # projects/retail_sales_walmart/scripts/train.py
@@ -29,6 +32,7 @@ Example project-specific wrapper:
 import logging
 import random
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import hydra
@@ -36,6 +40,14 @@ import numpy as np
 from omegaconf import DictConfig, OmegaConf
 
 from ml_portfolio.training.engine import TrainingEngine
+
+try:
+    from ml_portfolio.utils.mlflow_utils import MLflowTracker
+
+    MLFLOW_AVAILABLE = True
+except ImportError:
+    MLFLOW_AVAILABLE = False
+    logging.warning("MLflow not available. Install with: pip install mlflow")
 
 # Add src and project root to path for imports
 src_dir = Path(__file__).parent.parent.parent
@@ -50,7 +62,7 @@ logger = logging.getLogger(__name__)
 
 def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training") -> float:
     """
-    Main training pipeline with Hydra configuration.
+    Main training pipeline with Hydra configuration and MLflow tracking.
 
     Args:
         cfg: Hydra configuration object (automatically loaded from conf/)
@@ -66,6 +78,53 @@ def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training")
     # Log configuration
     logger.info("Configuration:")
     logger.info(OmegaConf.to_yaml(cfg))
+
+    # Initialize MLflow tracking with enhanced Hydra synergy
+    mlflow_tracker = None
+    if MLFLOW_AVAILABLE and hasattr(cfg, "mlflow"):
+        try:
+            mlflow_tracker = MLflowTracker(cfg.mlflow)
+
+            # Extract information directly from cfg (more reliable than HydraConfig)
+            model_name = cfg.model._target_.split(".")[-1]
+            dataset_name = cfg.dataset_factory._target_.split(".")[-1]
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # Infer Hydra context from cfg structure and resolved paths
+            hydra_info = {
+                "model_name": model_name,
+                "dataset_name": dataset_name,
+                "config_resolved": True,
+                "hydra_version": hydra.__version__,
+                "total_params": len(OmegaConf.to_container(cfg, resolve=True)),
+            }
+
+            # Generate informative run name
+            run_name = f"{model_name}_{dataset_name}_{timestamp}"
+
+            # Start MLflow run with comprehensive tags derived from cfg
+            mlflow_tracker.start_run(
+                run_name=run_name,
+                tags={
+                    "model_type": model_name,
+                    "dataset": dataset_name,
+                    "config_resolved": "true",
+                    "hydra_version": hydra_info["hydra_version"],
+                    "total_config_params": str(hydra_info["total_params"]),
+                    "experiment_framework": "hydra_mlflow",
+                    "model_target": cfg.model._target_,
+                    "dataset_target": cfg.dataset_factory._target_,
+                    "training_epochs": str(cfg.training.max_epochs),
+                    "optimizer_used": cfg.optimizer._target_ if cfg.optimizer else "none",
+                },
+            )
+
+            # Log configuration
+            mlflow_tracker.log_config(cfg)
+
+        except Exception as e:
+            logger.warning(f"Failed to initialize MLflow tracking: {e}")
+            mlflow_tracker = None
 
     # Set random seed for reproducibility
     if hasattr(cfg, "seed"):
@@ -86,10 +145,12 @@ def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training")
 
     # Log dataset info from the train dataset (all should have same metadata)
     n_features = None
+    feature_names = None
     if hasattr(train_dataset, "get_data_info"):
         info = train_dataset.get_data_info()
         logger.info(f"Dataset info: {info}")
         n_features = info.get("n_features")
+        feature_names = info.get("feature_names", [])
 
     # ========================================================================
     # 2. instantiate dataloaders for each split
@@ -155,7 +216,7 @@ def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training")
             logger.warning(f"  - Failed to instantiate {metric_name}: {e}")
 
     # ========================================================================
-    # 7. Extract training parameters and create training engine
+    # 7. Extract training parameters and create training engine with MLflow
     # ========================================================================
     logger.info("Creating TrainingEngine with datasets...")
 
@@ -170,6 +231,7 @@ def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training")
 
     logger.info(f"Training parameters: max_epochs={max_epochs}, early_stopping={early_stopping}, patience={patience}")
 
+    # Create training engine with MLflow integration
     engine = TrainingEngine(
         model=model,
         metrics=metrics,
@@ -184,6 +246,7 @@ def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training")
         verbose=verbose,
         monitor_metric=monitor_metric,
         min_delta=min_delta,
+        mlflow_tracker=mlflow_tracker,  # Pass MLflow tracker to engine
     )
 
     # ========================================================================
@@ -194,10 +257,34 @@ def train_pipeline(cfg: DictConfig, project_name: str = "ML Portfolio Training")
     # Training completion is logged by engine
 
     # ========================================================================
-    # 9. Evaluate on test set (engine handles internally)
+    # 9. Evaluate on test set and log to MLflow
     # ========================================================================
     test_metrics = engine.evaluate_test()
     # Test evaluation is logged by engine
+
+    # Log model to MLflow
+    if mlflow_tracker and mlflow_tracker.cfg.log_model:
+        try:
+            # Get sample input for model signature
+            sample_X, _ = next(iter(dataloader_train))
+
+            # Log the trained model
+            mlflow_tracker.log_model(
+                model=model, model_name="model", input_example=sample_X[:5] if len(sample_X) > 5 else sample_X
+            )
+
+            # Log feature importance if available
+            mlflow_tracker.log_feature_importance(model, feature_names)
+
+            # Register model if configured
+            mlflow_tracker.register_model()
+
+        except Exception as e:
+            logger.warning(f"Failed to log model to MLflow: {e}")
+
+    # End MLflow run
+    if mlflow_tracker:
+        mlflow_tracker.end_run()
 
     # Return primary metric for optimization
     primary_metric = cfg.metrics.get("primary_metric", "mse")
