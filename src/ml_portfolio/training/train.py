@@ -1,57 +1,43 @@
 """
-Training script for Walmart Sales Forecasting with Hydra configuration.
+Generic Training Script with Hydra Configuration.
 
-This script orchestrates the complete training pipeline:
-1. Load and instantiate datasets (train/val/test splits)
-2. Instantiate model from config
-3. Create training engine with DataLoader support
-4. Train model with validation
-5. Evaluate on test set
-6. Log results and save model
+This script provides a reusable training pipeline that can be called
+from project-specific scripts with different configurations.
 
-Usage:
-    # Run with default configuration
-    poetry run python projects/retail_sales_walmart/scripts/train.py
+DO NOT call this directly. Use project-specific train.py scripts instead.
 
-    # Override config parameters
-    poetry run python projects/retail_sales_walmart/scripts/train.py model=arima dataloader=pytorch
-
-    # Multi-run experiment sweep
-    poetry run python projects/retail_sales_walmart/scripts/train.py -m model=lstm,tcn dataloader=simple,pytorch
+Example:
+    # From projects/retail_sales_walmart/scripts/train.py
+    from ml_portfolio.training.train import train_pipeline
+    train_pipeline(cfg)
 """
 
-import sys
 import logging
-from pathlib import Path
+from typing import Dict, Any
+import numpy as np
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import numpy as np
-
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(project_root / "src"))
 
 from ml_portfolio.training.engine import TrainingEngine
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
-def main(cfg: DictConfig) -> float:
+def train_pipeline(cfg: DictConfig, project_name: str = "Training") -> float:
     """
-    Main training function using Hydra configuration.
+    Generic training pipeline that can be called from any project.
 
     Args:
-        cfg: Hydra configuration object from conf/config.yaml
+        cfg: Hydra configuration object
+        project_name: Name of the project for logging
 
     Returns:
         Primary metric value on test set (for Optuna optimization)
     """
     logger.info("=" * 60)
-    logger.info("Walmart Sales Forecasting - Training Pipeline")
+    logger.info(f"{project_name} - Training Pipeline")
     logger.info("=" * 60)
 
     # Log configuration
@@ -180,6 +166,5 @@ def main(cfg: DictConfig) -> float:
     for metric_name, metric_value in test_metrics.items():
         logger.info(f"  {metric_name}: {metric_value:.4f}")
 
-
-if __name__ == "__main__":
-    main()
+    # Return primary metric for optimization
+    return test_metrics.get(cfg.get("primary_metric", "mse"), 0.0)

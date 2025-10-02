@@ -1,0 +1,29 @@
+# Walmart dataset configuration
+# Uses WalmartDataset class for Walmart-specific data loading and preprocessing
+
+_target_: projects.retail_sales_walmart.data.walmart_dataset.WalmartDataset
+
+# Data path (relative to project root)
+data_path: projects/retail_sales_walmart/data/raw/Walmart.csv
+
+# Target column
+target_column: Weekly_Sales
+
+# Feature flags
+include_store_features: true
+include_dept_features: true
+include_holiday_features: true
+include_economic_features: true
+
+# Time series parameters
+lookback_window: 52  # 1 year of weekly data
+forecast_horizon: 12  # 12 weeks ahead
+
+# Data split ratios
+train_ratio: 0.7
+validation_ratio: 0.15
+test_ratio: 0.15
+
+# Preprocessing
+scaling: standard  # standard, minmax, robust, or null
+handle_missing: ffill  # forward fill missing values

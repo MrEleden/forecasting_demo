@@ -133,58 +133,6 @@ This project uses **Poetry** for modern Python dependency management, providing 
 - **`pyproject.toml`**: Main project configuration defining dependencies, build settings, and tool configurations
 - **`poetry.lock`**: Lock file ensuring exact dependency versions across environments (commit to Git)
 
-### Dependency Groups and Organization
-```toml
-[tool.poetry.dependencies]
-python = "^3.9"                    # Python version constraint
-# Core time series and ML
-pandas = ">=1.5.0"                 # Data manipulation
-numpy = ">=1.21.0"                 # Numerical computing
-scikit-learn = ">=1.0.0"           # Machine learning algorithms
-matplotlib = ">=3.5.0"             # Plotting and visualization
-plotly = ">=5.0.0"                 # Interactive visualizations
-
-# Statistical forecasting (optional installs)
-statsmodels = {version = ">=0.13.0", optional = true}  # ARIMA, seasonal decomposition
-prophet = {version = ">=1.1.0", optional = true}       # Facebook Prophet forecasting
-
-# Deep learning (optional installs)
-torch = {version = ">=1.11.0", optional = true}        # PyTorch for LSTM/Transformer
-gluonts = {version = ">=0.11.0", optional = true}      # DeepAR and advanced forecasting
-
-# Gradient boosting (optional installs)
-xgboost = {version = ">=1.6.0", optional = true}       # XGBoost for feature-based forecasting
-lightgbm = {version = ">=3.3.0", optional = true}     # LightGBM alternative
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.0.0"                 # Testing framework
-pytest-cov = "^4.0.0"             # Coverage reporting
-ruff = "^0.1.0"                   # Fast Python linter (replaces flake8)
-black = "^22.0.0"                 # Code formatting
-pre-commit = "^3.0.0"             # Git hooks for quality checks
-jupyter = "^1.0.0"                # Notebook development
-ipykernel = "^6.0.0"              # Jupyter kernel
-
-[tool.poetry.group.train.dependencies]
-optuna = "^3.4.0"                 # Hyperparameter optimization
-mlflow = "^2.8.0"                 # Experiment tracking (optional)
-hydra-core = "^1.3.0"             # Configuration management
-omegaconf = "^2.3.0"              # YAML/structured configs
-tensorboard = "^2.14.0"           # Training visualization
-
-[tool.poetry.group.app.dependencies]
-streamlit = "^1.15.0"             # Dashboard framework
-fastapi = "^0.104.0"              # API endpoints
-uvicorn = "^0.24.0"               # ASGI server
-pydantic = "^2.4.0"               # Request/response validation
-
-[tool.poetry.extras]
-statistical = ["statsmodels", "prophet"]
-deep_learning = ["torch", "gluonts"] 
-boosting = ["xgboost", "lightgbm"]
-all = ["statsmodels", "prophet", "torch", "gluonts", "xgboost", "lightgbm"]
-```
-
 ### Environment Setup Commands
 ```bash
 # Initial project setup
@@ -212,22 +160,6 @@ poetry check                      # Verify consistency
 poetry lock                       # Update lock file
 poetry export -f requirements.txt --output requirements.txt
 poetry export --with dev -f requirements.txt --output requirements-dev.txt
-```
-
-### Development Workflow Integration
-```bash
-# Quality checks (run before commits)
-poetry run ruff check src/ tests/           # Linting
-poetry run black src/ tests/                # Formatting
-poetry run pytest tests/ --cov=src/         # Testing with coverage
-
-# Training and experimentation
-poetry run python projects/retail_sales_walmart/scripts/train_arima.py
-poetry run streamlit run projects/retail_sales_walmart/app/dashboard.py
-
-# Production deployment
-poetry build                     # Build wheel and source distribution
-poetry install --only=main       # Install only production dependencies
 ```
 
 ### Docker Integration with Poetry
