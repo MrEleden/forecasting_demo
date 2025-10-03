@@ -2,6 +2,7 @@
 LSTM implementation for time series forecasting.
 """
 
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -52,6 +53,40 @@ class LSTMForecaster(PyTorchForecaster):
         self.batch_size = batch_size
 
         self.scaler_ = StandardScaler()
+        self.is_fitted_ = False
+
+    def _validate_input(self, X, y=None):
+        """Validate and convert input data."""
+        if isinstance(X, pd.DataFrame):
+            X = X.values
+        if isinstance(X, list):
+            X = np.array(X)
+
+        if y is not None:
+            if isinstance(y, pd.Series):
+                y = y.values
+            if isinstance(y, list):
+                y = np.array(y)
+            return X.astype(np.float32), y.astype(np.float32)
+
+        return X.astype(np.float32)
+
+    def _prepare_data(self, X, y=None):
+        """Convert numpy arrays to PyTorch tensors."""
+        X_tensor = torch.FloatTensor(X).to(self.device)
+
+        if y is not None:
+            y_tensor = torch.FloatTensor(y).to(self.device)
+            if len(y_tensor.shape) == 1:
+                y_tensor = y_tensor.unsqueeze(1)
+            return X_tensor, y_tensor
+
+        return X_tensor
+
+    def _check_is_fitted(self):
+        """Check if model is fitted."""
+        if not self.is_fitted_:
+            raise RuntimeError("Model must be fitted before making predictions")
 
     def _create_model(self):
         """Create the LSTM model."""
@@ -106,8 +141,7 @@ class LSTMForecaster(PyTorchForecaster):
         """Make predictions using the fitted LSTM model."""
         self._check_is_fitted()
 
-        if isinstance(X, pd.DataFrame):
-            X = X.values
+        X = self._validate_input(X)
 
         if len(X.shape) == 2:
             X = X.reshape(X.shape[0], 1, X.shape[1])
@@ -122,4 +156,4 @@ class LSTMForecaster(PyTorchForecaster):
             predictions = self.model_(X_tensor)
             predictions = predictions.cpu().numpy()
 
-        return predictions
+        return predictions.squeeze()
