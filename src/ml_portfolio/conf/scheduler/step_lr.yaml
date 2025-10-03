@@ -1,7 +1,9 @@
-# Step LR scheduler configuration (PyTorch)
+# Step LR Scheduler Configuration
 # Decays learning rate by gamma every step_size epochs
 
 _target_: torch.optim.lr_scheduler.StepLR
 
 step_size: 30  # Period of learning rate decay
 gamma: 0.1  # Multiplicative factor of learning rate decay
+
+# optimizer will be passed by the engine automatically

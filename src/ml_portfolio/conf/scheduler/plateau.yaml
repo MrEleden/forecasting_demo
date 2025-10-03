@@ -1,10 +1,15 @@
-# Reduce on Plateau scheduler configuration (PyTorch)
-# Reduces learning rate when metric plateaus
+# Reduce LR on Plateau Scheduler Configuration
+# Reduces learning rate when a metric has stopped improving
 
 _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
 
 mode: min  # min for loss, max for accuracy
-factor: 0.1  # Factor by which LR is reduced
-patience: 10  # Number of epochs with no improvement
-threshold: 0.0001  # Threshold for measuring improvement
-min_lr: 0.0  # Lower bound on learning rate
+factor: 0.1  # Factor by which the learning rate will be reduced
+patience: 10  # Number of epochs with no improvement after which learning rate will be reduced
+threshold: 0.0001  # Threshold for measuring the new optimum
+threshold_mode: rel  # rel or abs
+cooldown: 0  # Number of epochs to wait before resuming normal operation
+min_lr: 0.0  # Lower bound on the learning rate
+eps: 1.0e-08  # Minimal decay applied to lr
+
+# optimizer will be passed by the engine automatically

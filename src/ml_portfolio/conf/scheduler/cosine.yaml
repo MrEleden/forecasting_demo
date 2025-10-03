@@ -1,7 +1,9 @@
-# Cosine Annealing LR scheduler configuration (PyTorch)
+# Cosine Annealing LR Scheduler Configuration
 # Anneals learning rate using cosine function
 
 _target_: torch.optim.lr_scheduler.CosineAnnealingLR
 
 T_max: 50  # Maximum number of iterations
 eta_min: 0.0  # Minimum learning rate
+
+# optimizer will be passed by the engine automatically

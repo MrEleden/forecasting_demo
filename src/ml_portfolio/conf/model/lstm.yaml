@@ -1,19 +1,25 @@
-# LSTM model configuration (PyTorch)
-# Use with dataloader=pytorch and training.max_epochs>1
-# Note: input_size will be automatically set from dataset n_features
+# LSTM Model Configuration
+# Deep learning time series model
+# Uses: PyTorchDataLoader + PyTorchEngine + Adam optimizer + Cosine scheduler
 
+defaults:
+  - /dataloader: pytorch
+  - /engine: pytorch
+  - /optimizer: adam
+  - /scheduler: cosine
+
+# Model instantiation
 _target_: ml_portfolio.models.deep_learning.lstm.LSTMForecaster
 
-# Architecture
-input_size: 1  # Placeholder - will be overridden by dataset n_features
+# LSTM architecture
+input_size: 1  # Will be set based on dataset
 hidden_size: 128
 num_layers: 2
 dropout: 0.2
+bidirectional: false
 
 # Output
 output_size: 1  # Forecast horizon
 
-# Training parameters
-lr: 0.001
-epochs: 100
-batch_size: 64
+# Training (will be used by engine)
+learning_rate: 0.001

@@ -1,0 +1,40 @@
+# Statistical Preprocessing with MinMax Scaling
+#
+# StatisticalPreprocessingPipeline with MinMaxScaler (scales to [0, 1])
+# Good for neural networks
+
+# ============================================================================
+# STATIC FEATURE ENGINEERING (Applied BEFORE splitting)
+# ============================================================================
+static:
+  _target_: ml_portfolio.data.preprocessing.StaticTimeSeriesPreprocessingPipeline
+
+  date_column: date
+  group_columns: null
+  target_column: target
+
+  lag_features:
+    - 1
+    - 7
+    - 14
+
+  rolling_windows:
+    - 7
+    - 14
+
+  date_features: true
+
+  cyclical_features:
+    - month
+    - dayofweek
+
+# ============================================================================
+# STATISTICAL PREPROCESSING (Applied AFTER splitting, fit on train)
+# ============================================================================
+statistical:
+  _target_: ml_portfolio.data.preprocessing.StatisticalPreprocessingPipeline
+
+  steps:
+    - - feature_scaler
+      - _target_: sklearn.preprocessing.MinMaxScaler
+        feature_range: [0, 1]

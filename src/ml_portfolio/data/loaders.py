@@ -10,9 +10,22 @@ Architecture:
 - SimpleDataLoader: NumPy-based implementation (no dependencies)
 """
 
-from typing import Optional, Iterator, Tuple
 from abc import ABC, abstractmethod
+from typing import Iterator, Optional, Tuple
+
 import numpy as np
+
+from ml_portfolio.data.datasets import TimeSeriesDataset
+
+# Optional PyTorch support
+try:
+    import torch
+    from torch.utils.data import DataLoader as TorchDataLoader
+
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    TorchDataLoader = object  # Fallback for class inheritance
 
 
 class BaseDataLoader(ABC):
@@ -30,7 +43,7 @@ class BaseDataLoader(ABC):
             shuffle: true
     """
 
-    def __init__(self, dataset, batch_size: int = 32, shuffle: bool = False, **kwargs):
+    def __init__(self, dataset: TimeSeriesDataset, batch_size: int = 32, shuffle: bool = False, **kwargs):
         """
         Initialize base dataloader.
 
@@ -93,7 +106,7 @@ class SimpleDataLoader(BaseDataLoader):
 
     def __init__(
         self,
-        dataset,
+        dataset: TimeSeriesDataset,
         batch_size: Optional[int] = None,  # Ignored, always uses full dataset
         shuffle: bool = False,
         **kwargs,
@@ -146,15 +159,19 @@ class SimpleDataLoader(BaseDataLoader):
         return 1
 
 
-class PyTorchDataLoader(BaseDataLoader):
+class PyTorchDataLoader(TorchDataLoader):
     """
-    PyTorch DataLoader wrapper that inherits from torch.utils.data.DataLoader.
+    PyTorch DataLoader that inherits from torch.utils.data.DataLoader.
 
     This provides native PyTorch batching capabilities:
     - Multi-process data loading (num_workers)
     - GPU memory pinning (pin_memory)
     - Advanced sampling strategies
     - Efficient mini-batch iteration
+
+    The key difference from standard PyTorch DataLoader is that __iter__
+    automatically converts tensors to numpy arrays for compatibility with
+    the BaseDataLoader interface.
 
     Usage:
         loader = PyTorchDataLoader(dataset, batch_size=64, num_workers=4)
@@ -173,7 +190,7 @@ class PyTorchDataLoader(BaseDataLoader):
 
     def __init__(
         self,
-        dataset,
+        dataset: TimeSeriesDataset,
         batch_size: int = 32,
         shuffle: bool = False,
         num_workers: int = 0,
@@ -193,45 +210,34 @@ class PyTorchDataLoader(BaseDataLoader):
             drop_last: Whether to drop the last incomplete batch
             **kwargs: Additional PyTorch DataLoader parameters
         """
-        # Import PyTorch DataLoader
-        try:
-            from torch.utils.data import DataLoader as TorchDataLoader
-
-            # Initialize the PyTorch DataLoader as the base class
-            self.torch_loader = TorchDataLoader(
-                dataset=dataset,
-                batch_size=batch_size,
-                shuffle=shuffle,
-                num_workers=num_workers,
-                pin_memory=pin_memory,
-                drop_last=drop_last,
-                **kwargs,
-            )
-
-            # Store parameters for BaseDataLoader interface
-            self.dataset = dataset
-            self.batch_size = batch_size
-            self.shuffle = shuffle
-            self.num_workers = num_workers
-            self.pin_memory = pin_memory
-            self.drop_last = drop_last
-            self.kwargs = kwargs
-
-        except ImportError:
+        if not TORCH_AVAILABLE:
             raise ImportError(
                 "PyTorch is required for PyTorchDataLoader. "
                 "Install with: pip install torch\n"
                 "Or use SimpleDataLoader instead."
             )
 
+        # Initialize PyTorch DataLoader parent class
+        super().__init__(
+            dataset=dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            drop_last=drop_last,
+            **kwargs,
+        )
+
     def __iter__(self) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
         """
         Iterate over batches from PyTorch DataLoader.
 
+        Overrides parent __iter__ to convert tensors to numpy arrays.
+
         Yields:
             Tuple of (X_batch, y_batch) as numpy arrays
         """
-        for X_batch, y_batch in self.torch_loader:
+        for X_batch, y_batch in super().__iter__():
             # Convert tensors to numpy
             if hasattr(X_batch, "numpy"):
                 X_batch = X_batch.numpy()
@@ -239,12 +245,3 @@ class PyTorchDataLoader(BaseDataLoader):
                 y_batch = y_batch.numpy()
 
             yield X_batch, y_batch
-
-    def __len__(self) -> int:
-        """
-        Return number of batches.
-
-        Returns:
-            Number of batches in the dataset
-        """
-        return len(self.torch_loader)

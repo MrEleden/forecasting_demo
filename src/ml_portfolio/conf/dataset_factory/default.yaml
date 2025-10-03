@@ -1,25 +1,27 @@
-# Dataset Factory Configuration
-# Creates train/val/test dataset splits via factory pattern
+# Default Dataset Factory Configuration
+# Creates train/val/test dataset splits from raw data
+# Static feature engineering happens BEFORE splitting (safe, deterministic)
+# Statistical preprocessing happens AFTER splitting (fit on train)
 
-_target_: ml_portfolio.data.datasets.DatasetFactory
+_target_: ml_portfolio.data.dataset_factory.DatasetFactory
 
-# The dataset class to instantiate for each split
-dataset_class: ml_portfolio.data.datasets.TimeSeriesDataset
+# Data source
+data_path: data/processed/data.csv  # Path to data file (CSV or Parquet)
+
+# Column specifications
+target_column: target  # Name of target column
+feature_columns: null  # List of feature columns, null = all except target
+timestamp_column: null  # Optional timestamp column for time series
 
 # Split ratios (must sum to 1.0)
 train_ratio: 0.7
-validation_ratio: 0.15
+val_ratio: 0.15
 test_ratio: 0.15
 
-# Dataset constructor arguments (passed to each dataset instance)
-data_path: data/processed/train.parquet
-features: null  # List of feature columns, null = all except target
-target: target  # Target column name
+# Static feature engineering (applied BEFORE splitting)
+# This is passed from cfg.feature_engineering.static in train.py
+static_feature_engineer: ${feature_engineering.static}
 
-# Time series parameters
-lookback_window: 24  # Number of past timesteps to use
-forecast_horizon: 1  # Number of future timesteps to predict
-
-# Preprocessing
-scaling: standard  # standard, minmax, robust, or null
-handle_missing: ffill  # ffill, bfill, drop, or null
+# Note:
+# - Static features are applied BEFORE splitting (safe, no leakage)
+# - Statistical preprocessing happens AFTER splitting using StatisticalPreprocessingPipeline

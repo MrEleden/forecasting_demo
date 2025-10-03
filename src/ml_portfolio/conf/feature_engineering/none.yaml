@@ -1,0 +1,13 @@
+# No Feature Engineering or Preprocessing
+#
+# Use raw features only (good for tree-based models)
+
+# ============================================================================
+# STATIC FEATURE ENGINEERING (Applied BEFORE splitting)
+# ============================================================================
+static: null  # No static feature engineering
+
+# ============================================================================
+# STATISTICAL PREPROCESSING (Applied AFTER splitting, fit on train)
+# ============================================================================
+statistical: null  # No statistical preprocessing

@@ -1,9 +1,12 @@
-# SimpleDataLoader configuration
-# Returns all data in single batch (infinite batch size)
-# Perfect for sklearn models that expect fit(X, y) with complete dataset
+# SimpleDataLoader Configuration
+# Returns all data in a single batch (full dataset)
+# Perfect for sklearn and statistical models that expect fit(X, y) with complete dataset
 
 _target_: ml_portfolio.data.loaders.SimpleDataLoader
-shuffle: true  # Shuffle indices before creating batch
 
-# Note: batch_size is ignored - always returns full dataset
+# batch_size is ignored - always returns full dataset
 # This loader yields exactly 1 batch containing all data
+
+shuffle: false  # Shuffle indices before creating batch (usually false for time series)
+
+# dataset parameter will be passed by train.py when instantiating

@@ -1,16 +1,21 @@
-# Random Forest model configuration (sklearn)
-# Use with SimpleDataLoader and max_epochs=1
+# Random Forest Model Configuration
+# Sklearn ensemble model for forecasting
+# Uses: SimpleDataLoader + StatisticalEngine
 
+defaults:
+  - /dataloader: simple
+  - /engine: statistical
+
+# Model instantiation
 _target_: sklearn.ensemble.RandomForestRegressor
 
-# Model parameters
+# Random Forest parameters
 n_estimators: 100
 max_depth: 10
-min_samples_split: 5
-min_samples_leaf: 2
-max_features: sqrt
+min_samples_split: 2
+min_samples_leaf: 1
+max_features: auto
+bootstrap: true
 random_state: 42
-
-# Performance
 n_jobs: -1  # Use all CPU cores
 verbose: 0

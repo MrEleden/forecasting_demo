@@ -1,0 +1,41 @@
+# Statistical Preprocessing with Robust Scaling
+#
+# StatisticalPreprocessingPipeline with RobustScaler (good for outliers)
+
+# ============================================================================
+# STATIC FEATURE ENGINEERING (Applied BEFORE splitting)
+# ============================================================================
+static:
+  _target_: ml_portfolio.data.preprocessing.StaticTimeSeriesPreprocessingPipeline
+
+  date_column: date
+  group_columns: null
+  target_column: target
+
+  lag_features:
+    - 1
+    - 7
+    - 14
+
+  rolling_windows:
+    - 7
+    - 14
+
+  date_features: true
+
+  cyclical_features:
+    - month
+    - dayofweek
+
+# ============================================================================
+# STATISTICAL PREPROCESSING (Applied AFTER splitting, fit on train)
+# ============================================================================
+statistical:
+  _target_: ml_portfolio.data.preprocessing.StatisticalPreprocessingPipeline
+
+  steps:
+    - - feature_scaler
+      - _target_: sklearn.preprocessing.RobustScaler
+        with_centering: true
+        with_scaling: true
+        quantile_range: [25.0, 75.0]

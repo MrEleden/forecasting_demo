@@ -1,14 +1,20 @@
-# ARIMA model configuration (statsmodels)
-# Use with dataloader=simple (shuffle=false) and training.max_epochs=1
+# ARIMA Model Configuration
+# Statistical time series model
+# Uses: SimpleDataLoader + StatisticalEngine
 
-_target_: ml_portfolio.models.statistical.statistical.ARIMAWrapper
+defaults:
+  - /dataloader: simple
+  - /engine: statistical
 
-# ARIMA model parameters
-order: [1, 1, 1]  # (p, d, q) - autoregressive, differencing, moving average
-seasonal_order: [0, 0, 0, 0]  # (P, D, Q, s) - seasonal components
+# Model instantiation
+_target_: ml_portfolio.models.statistical.arima.ARIMAForecaster
 
-# Model structure parameters
-trend: null  # Trend component: 'n' (none), 'c' (constant), 't' (linear trend), 'ct' (both)
-enforce_stationarity: true  # Enforce stationarity of AR parameters
-enforce_invertibility: true  # Enforce invertibility of MA parameters
-concentrate_scale: false  # Concentrate scale parameter
+# ARIMA parameters
+order: [1, 1, 1]  # (p, d, q)
+seasonal_order: [0, 0, 0, 0]  # (P, D, Q, s)
+
+# Fitting options
+trend: null  # null, 'c', 't', 'ct'
+method: lbfgs  # Optimization method
+maxiter: 50
+suppress_warnings: true

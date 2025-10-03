@@ -1,0 +1,37 @@
+# PyTorch Engine Configuration
+# For deep learning models (LSTM, Transformer, TCN, etc.)
+# Trains iteratively with mini-batch gradient descent
+#
+# NOTE: This engine requires optimizer and scheduler to be specified
+# in the model config defaults (e.g., /optimizer: adam, /scheduler: cosine)
+
+_target_: ml_portfolio.training.engine.PyTorchEngine
+
+# Training parameters
+max_epochs: 100
+verbose: true
+
+# Early stopping
+early_stopping: true
+patience: 10
+min_delta: 0.0001
+monitor_metric: val_loss  # Metric to monitor for early stopping
+
+# Gradient clipping
+grad_clip: null  # Set to value like 1.0 to enable gradient clipping
+
+# Device management
+device: auto  # auto (use GPU if available), cuda, or cpu
+
+# Loss function (will be instantiated by train.py if needed)
+loss_fn: null  # e.g., torch.nn.MSELoss for regression
+
+# These will be passed by train.py when instantiating:
+# - model: The model instance
+# - optimizer: Optimizer instance (from cfg.optimizer)
+# - scheduler: LR scheduler instance (from cfg.scheduler, can be null)
+# - train_loader: Training data loader
+# - val_loader: Validation data loader
+# - test_loader: Test data loader
+# - mlflow_tracker: MLflow tracking (optional)
+# - checkpoint_dir: Directory to save checkpoints

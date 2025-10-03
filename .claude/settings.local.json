@@ -18,7 +18,8 @@
       "Bash(pip uninstall:*)",
       "Bash(find:*)",
       "Bash(tree:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

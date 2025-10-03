@@ -1,0 +1,37 @@
+# Static Features Only
+#
+# Only StaticTimeSeriesPreprocessingPipeline (applied BEFORE splitting)
+# No statistical preprocessing
+
+# ============================================================================
+# STATIC FEATURE ENGINEERING (Applied BEFORE splitting)
+# ============================================================================
+static:
+  _target_: ml_portfolio.data.preprocessing.StaticTimeSeriesPreprocessingPipeline
+
+  date_column: date
+  group_columns: null
+  target_column: target
+
+  lag_features:
+    - 1
+    - 7
+    - 14
+    - 28
+
+  rolling_windows:
+    - 7
+    - 14
+    - 30
+
+  date_features: true
+
+  cyclical_features:
+    - month
+    - dayofweek
+    - quarter
+
+# ============================================================================
+# STATISTICAL PREPROCESSING (Applied AFTER splitting, fit on train)
+# ============================================================================
+statistical: null  # No statistical preprocessing

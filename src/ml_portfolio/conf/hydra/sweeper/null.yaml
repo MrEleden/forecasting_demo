@@ -1,5 +1,0 @@
-# @package hydra.sweeper
-# Null sweeper configuration for single runs
-
-# Basic hydra launcher (no sweeper)
-_target_: hydra._internal.BasicLauncher

@@ -1,268 +1,396 @@
-"""
-Training Engine for ML Portfolio Forecasting.
-
-This module provides a unified training interface that works with any model
-implementing .fit() and .predict() methods. It handles training loops,
-validation, metrics computation, and testing.
-"""
-
 import logging
 import time
+from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
 
+from ml_portfolio.data.loaders import BaseDataLoader, SimpleDataLoader
+from ml_portfolio.evaluation.metrics import mae, mape, rmse
+from ml_portfolio.models.base import BaseForecaster, StatisticalForecaster
+
 logger = logging.getLogger(__name__)
 
 
-class TrainingEngine:
+class BaseEngine(ABC):
     """
-    Unified training engine for forecasting models.
+    Abstract base class for all training engines.
 
-    Handles training, validation, and testing with support for:
-    - Any model with .fit() and .predict() methods
-    - DataLoader-based batch training
-    - Metric computation and logging
-    - Early stopping (for iterative models)
+    Expects DataLoaders that implement __iter__ for data iteration.
+    Both PyTorch and Statistical engines use the same iteration pattern:
+    `for batch_x, batch_y in loader:`
 
-    Usage:
-        # Initialize engine with model, metrics, and dataloaders
-        engine = TrainingEngine(
-            model=model,
-            metrics=metrics,
-            train_dataset=train_loader,
-            val_dataset=val_loader,
-            test_dataset=test_loader
-        )
-
-        # Train model
-        results = engine.train()
-
-        # Evaluate on test set
-        test_metrics = engine.evaluate_test()
+    The difference is in what constitutes a "batch":
+    - PyTorchEngine: Many small batches (mini-batch training)
+    - StatisticalEngine: One large batch (full dataset)
     """
 
     def __init__(
         self,
-        model,
-        metrics: Optional[Dict[str, Any]] = None,
-        train_dataset=None,
-        val_dataset=None,
-        test_dataset=None,
-        optimizer=None,
-        scheduler=None,
-        max_epochs: int = 100,
-        patience: int = 10,
-        early_stopping: bool = True,
+        model: BaseForecaster,
+        train_loader: BaseDataLoader = None,
+        val_loader: BaseDataLoader = None,
+        test_loader: BaseDataLoader = None,
+        mlflow_tracker: Optional[Any] = None,
+        checkpoint_dir: Optional[Path] = None,
         verbose: bool = True,
-        monitor_metric: str = "val_loss",
-        min_delta: float = 1e-4,
-        mlflow_tracker=None,
+        metrics: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ):
         """
-        Initialize TrainingEngine.
+        Initialize base engine with model and data loaders.
 
         Args:
-            model: Model with .fit(X, y) and .predict(X) methods
-            metrics: Dictionary of metric functions {name: metric_fn}
-            train_dataset: Training dataloader (iterator yielding batches)
-            val_dataset: Validation dataloader (iterator yielding batches)
-            test_dataset: Test dataloader (iterator yielding batches)
-            optimizer: PyTorch optimizer (optional, for deep learning models)
-            scheduler: Learning rate scheduler (optional, for deep learning models)
-            max_epochs: Maximum number of training epochs
-            patience: Number of epochs to wait for improvement before early stopping
-            early_stopping: Whether to enable early stopping
+            model: Model to train
+            train_loader: Training DataLoader (must implement __iter__)
+            val_loader: Validation DataLoader (must implement __iter__)
+            test_loader: Test DataLoader (must implement __iter__)
+            mlflow_tracker: MLflow tracker for experiment logging
+            checkpoint_dir: Directory to save checkpoints
             verbose: Whether to log training progress
-            monitor_metric: Metric to monitor for early stopping
-            min_delta: Minimum improvement threshold for early stopping
-            mlflow_tracker: MLflow tracker for experiment logging (optional)
+            metrics: Dictionary of metric functions to compute
+            **kwargs: Additional parameters for subclasses
         """
         self.model = model
-        self.metrics = metrics or {}
-        self.train_dataset = train_dataset
-        self.val_dataset = val_dataset
-        self.test_dataset = test_dataset
-        self.optimizer = optimizer
-        self.scheduler = scheduler
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.test_loader = test_loader
         self.mlflow_tracker = mlflow_tracker
-
-        # Training parameters (now passed directly)
-        self.max_epochs = max_epochs
-        self.patience = patience
-        self.early_stopping = early_stopping
+        self.checkpoint_dir = checkpoint_dir
         self.verbose = verbose
-        self.monitor_metric = monitor_metric
-        self.min_delta = min_delta
+        self.metrics = metrics or {}
 
         # Training history
-        self.history = {"train_loss": [], "val_loss": [], "train_metrics": [], "val_metrics": [], "epoch_times": []}
+        self.history = {"train_metrics": [], "val_metrics": [], "test_metrics": [], "epoch_times": []}
 
-        # Early stopping state
-        self.best_metric = float("inf")
-        self.patience_counter = 0
-        self.best_epoch = 0
+        # Store additional parameters
+        self.engine_params = kwargs
 
         if self.verbose:
-            logger.info(f"TrainingEngine initialized for {self.model.__class__.__name__}")
+            logger.info(f"Engine initialized for {self.model.__class__.__name__}")
+            logger.info(f"Train loader: {self._describe_loader(train_loader)}")
+            if val_loader:
+                logger.info(f"Val loader: {self._describe_loader(val_loader)}")
+            if test_loader:
+                logger.info(f"Test loader: {self._describe_loader(test_loader)}")
+
+    @abstractmethod
+    def train(self) -> Dict[str, Any]:
+        """
+        Train the model using the provided data loaders.
+
+        Implementation varies significantly:
+        - PyTorchEngine: Multiple epochs, optimizer steps, early stopping, callbacks
+        - StatisticalEngine: Single pass, direct model.fit()
+
+        Returns:
+            Dictionary with training results
+        """
+        pass
+
+    @abstractmethod
+    def evaluate(self, loader: BaseDataLoader) -> Dict[str, float]:
+        """
+        Evaluate model on a data loader.
+
+        Should iterate over the loader:
+        `for batch_x, batch_y in loader:`
+
+        Args:
+            loader: DataLoader to evaluate on
+
+        Returns:
+            Dictionary of metrics
+        """
+        pass
+
+    def test(self) -> Dict[str, float]:
+        """
+        Evaluate model on test set.
+
+        Returns:
+            Test metrics dictionary
+        """
+        if self.test_loader is None:
+            raise ValueError("No test loader provided")
+
+        if self.verbose:
+            logger.info("Evaluating on test set...")
+
+        metrics = self.evaluate(self.test_loader)
+        self.history["test_metrics"].append(metrics)
+
+        if self.verbose:
+            logger.info("Test metrics:")
+            for metric_name, value in metrics.items():
+                logger.info(f"  {metric_name}: {value:.4f}")
+
+        return metrics
+
+    def _describe_loader(self, loader: Any) -> str:
+        """Get description of data loader."""
+        if loader is None:
+            return "None"
+
+        # Check for common attributes
+        descriptions = []
+
+        # Check if it has length
+        if hasattr(loader, "__len__"):
+            try:
+                descriptions.append(f"{len(loader)} batches")
+            except:
+                pass
+
+        # Check if it's a known type
+        loader_type = type(loader).__name__
+        descriptions.append(loader_type)
+
+        # Check for batch_size attribute
+        if hasattr(loader, "batch_size"):
+            descriptions.append(f"batch_size={loader.batch_size}")
+
+        # Check for dataset size
+        if hasattr(loader, "n_samples"):
+            descriptions.append(f"n_samples={loader.n_samples}")
+        elif hasattr(loader, "dataset"):
+            if hasattr(loader.dataset, "__len__"):
+                descriptions.append(f"dataset_size={len(loader.dataset)}")
+
+        return ", ".join(descriptions) if descriptions else "Unknown loader type"
+
+    def _log_metrics(self, epoch: int, metrics: Dict[str, float], phase: str = ""):
+        """Log metrics to console and MLflow."""
+        if not self.verbose:
+            return
+
+        # Log to console
+        metric_str = ", ".join([f"{k}: {v:.4f}" for k, v in metrics.items()])
+        if phase:
+            logger.info(f"Epoch {epoch + 1} [{phase}]: {metric_str}")
+        else:
+            logger.info(f"Epoch {epoch + 1}: {metric_str}")
+
+        # Log to MLflow if available
+        if self.mlflow_tracker:
+            try:
+                if phase:
+                    prefixed_metrics = {f"{phase}_{k}": v for k, v in metrics.items()}
+                else:
+                    prefixed_metrics = metrics
+                self.mlflow_tracker.log_metrics(prefixed_metrics, step=epoch)
+            except Exception as e:
+                logger.warning(f"Failed to log metrics to MLflow: {e}")
+
+    def save_checkpoint(self, path: Optional[Path] = None, is_best: bool = False):
+        """Save model checkpoint."""
+        if path is None and self.checkpoint_dir:
+            if is_best:
+                filename = "best_model.pkl"  # Use .pkl as default for compatibility
+            else:
+                epoch_num = len(self.history["train_metrics"])
+                filename = f"checkpoint_epoch_{epoch_num}.pkl"
+            path = self.checkpoint_dir / filename
+
+        if path:
+            path = Path(path)
+            try:
+                self._save_model_state(path)
+                if self.verbose:
+                    logger.info(f"Saved checkpoint to {path}")
+            except Exception as e:
+                logger.error(f"Failed to save checkpoint: {e}")
+
+    @abstractmethod
+    def _save_model_state(self, path: Path):
+        """
+        Save model state to file.
+
+        Implementation depends on model type:
+        - PyTorch: Save state_dict
+        - Statistical: Pickle entire model
+        """
+        pass
+
+    @abstractmethod
+    def load_checkpoint(self, path: Path):
+        """
+        Load model state from file.
+
+        Implementation depends on model type:
+        - PyTorch: Load state_dict
+        - Statistical: Unpickle model
+        """
+        pass
+
+    def get_training_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of the training process.
+
+        Returns:
+            Dictionary with training summary statistics
+        """
+        summary = {
+            "model_type": self.model.__class__.__name__,
+            "total_epochs": len(self.history["train_metrics"]),
+            "total_training_time": sum(self.history["epoch_times"]),
+        }
+
+        # Add best metrics if available
+        if self.history["train_metrics"]:
+            # Get last epoch metrics
+            summary["final_train_metrics"] = self.history["train_metrics"][-1]
+
+        if self.history["val_metrics"]:
+            # Get best validation metrics (assuming lower is better for loss)
+            val_losses = [m.get("loss", float("inf")) for m in self.history["val_metrics"]]
+            if val_losses:
+                best_idx = np.argmin(val_losses)
+                summary["best_val_metrics"] = self.history["val_metrics"][best_idx]
+                summary["best_epoch"] = best_idx + 1
+
+        if self.history["test_metrics"]:
+            summary["test_metrics"] = self.history["test_metrics"][-1]
+
+        return summary
+
+
+class StatisticalEngine(BaseEngine):
+    """
+    Training engine for statistical models (ARIMA, sklearn).
+    Handles models that fit in a single pass rather than iterative training.
+    Expects SimpleDataLoader that yields full dataset in one iteration.
+    """
+
+    def __init__(
+        self,
+        model: StatisticalForecaster,
+        train_loader: SimpleDataLoader = None,
+        val_loader: SimpleDataLoader = None,
+        test_loader: SimpleDataLoader = None,
+        mlflow_tracker: Optional[Any] = None,
+        checkpoint_dir: Optional[Path] = None,
+        verbose: bool = True,
+        **kwargs,
+    ):
+        """
+        Initialize statistical engine.
+
+        Args:
+            model: Statistical model with fit/predict interface
+            train_loader: Training data loader (SimpleDataLoader expected)
+            val_loader: Validation data loader
+            test_loader: Test data loader
+            mlflow_tracker: MLflow tracker for experiment logging
+            checkpoint_dir: Directory to save model
+            verbose: Whether to log progress
+        """
+        super().__init__(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            mlflow_tracker=mlflow_tracker,
+            checkpoint_dir=checkpoint_dir,
+            verbose=verbose,
+            **kwargs,
+        )
 
     def train(self) -> Dict[str, Any]:
         """
-        Train the model using training dataloader.
+        Train statistical model with single fit call.
 
         Returns:
-            Dictionary with training results:
-                - history: Training history
-                - best_epoch: Best epoch number
-                - converged: Whether training converged
-                - total_training_time: Total training time
+            Dictionary with training results
         """
-        if self.train_dataset is None:
-            raise ValueError("No training dataset provided")
+        if self.train_loader is None:
+            raise ValueError("No training data loader provided")
 
         if self.verbose:
             logger.info("=" * 60)
             logger.info(f"Training {self.model.__class__.__name__}")
-            logger.info(f"Max epochs: {self.max_epochs}")
             logger.info("=" * 60)
 
         start_time = time.time()
 
-        # Unified training (epochs from config)
-        results = self._train()
-
-        total_time = time.time() - start_time
-        results["total_training_time"] = total_time
-
-        if self.verbose:
-            logger.info("=" * 60)
-            logger.info(f"Training completed in {total_time:.2f}s")
-            logger.info(f"Best epoch: {results['best_epoch']}")
-            logger.info(f"Converged: {results['converged']}")
-            logger.info("=" * 60)
-
-        return results
-
-    def _train(self) -> Dict[str, Any]:
-        """
-        Unified training function for all model types.
-
-        Training behavior is controlled by config:
-        - Single-shot (sklearn): max_epochs=1, batch_size=inf (dataloader gives all data)
-        - Iterative (PyTorch): max_epochs>1, batch_size=32/64/etc (dataloader yields mini-batches)
-
-        The dataloader handles batching internally. Engine just loops through epochs and batches.
-
-        Returns:
-            Training results dictionary
-        """
-        best_val_metric = float("inf")
-
-        # Train for specified number of epochs
-        for epoch in range(self.max_epochs):
-            epoch_start = time.time()
-
+        # Iterate over training loader (single iteration for full data)
+        for X_train, y_train in self.train_loader:
             if self.verbose:
-                logger.info(f"Epoch {epoch + 1}/{self.max_epochs}")
+                logger.info(f"Training data shape: X={X_train.shape}, y={y_train.shape}")
 
-            # Train on all batches from dataloader
-            for X_batch, y_batch in self.train_dataset:
-                # Dataloader provides X_batch, y_batch as numpy arrays
-                self.model.fit(X_batch, y_batch)
+            # Fit model (single call)
+            self.model.fit(X_train, y_train)
 
-            epoch_time = time.time() - epoch_start
-
-            # Compute metrics after epoch
-            train_metrics = self._evaluate_loader(self.train_dataset, prefix="train_")
-            val_metrics = self._evaluate_loader(self.val_dataset, prefix="val_") if self.val_dataset else {}
-
-            # Store history
+            # Compute training metrics
+            y_pred_train = self.model.predict(X_train)
+            train_metrics = self._compute_metrics(y_train, y_pred_train, prefix="train_")
             self.history["train_metrics"].append(train_metrics)
+
+        # Compute validation metrics if available
+        val_metrics = {}
+        if self.val_loader is not None:
+            val_metrics = self.evaluate(self.val_loader)
+            val_metrics = {f"val_{k}": v for k, v in val_metrics.items()}
             self.history["val_metrics"].append(val_metrics)
-            self.history["epoch_times"].append(epoch_time)
 
-            if self.verbose:
-                self._log_metrics(epoch, train_metrics, val_metrics, epoch_time)
+        # Training time
+        training_time = time.time() - start_time
+        self.history["epoch_times"].append(training_time)
 
-            # Learning rate scheduler step (for PyTorch models)
-            if self.scheduler is not None:
-                # Check if scheduler needs metric (ReduceLROnPlateau)
-                if hasattr(self.scheduler, "step") and "metrics" in self.scheduler.step.__code__.co_varnames:
-                    # ReduceLROnPlateau needs validation metric
-                    current_metric = val_metrics.get(self.monitor_metric, float("inf"))
-                    self.scheduler.step(current_metric)
-                else:
-                    # Regular schedulers (StepLR, CosineAnnealingLR, etc.)
-                    self.scheduler.step()
+        # Log metrics
+        if self.verbose:
+            logger.info(f"Training completed in {training_time:.2f}s")
+            for metric_name, value in train_metrics.items():
+                logger.info(f"  {metric_name}: {value:.4f}")
+            for metric_name, value in val_metrics.items():
+                logger.info(f"  {metric_name}: {value:.4f}")
 
-                if self.verbose and hasattr(self.optimizer, "param_groups"):
-                    current_lr = self.optimizer.param_groups[0]["lr"]
-                    logger.info(f"Learning rate: {current_lr:.6f}")
+        # Log to MLflow
+        if self.mlflow_tracker:
+            all_metrics = {**train_metrics, **val_metrics}
+            all_metrics["training_time"] = training_time
+            try:
+                self.mlflow_tracker.log_metrics(all_metrics)
+            except Exception as e:
+                logger.warning(f"Failed to log metrics to MLflow: {e}")
 
-            # Early stopping check
-            if self.early_stopping and self.val_dataset is not None:
-                current_metric = val_metrics.get(self.monitor_metric, float("inf"))
-
-                if current_metric < best_val_metric - self.min_delta:
-                    best_val_metric = current_metric
-                    self.best_epoch = epoch
-                    self.patience_counter = 0
-                else:
-                    self.patience_counter += 1
-
-                if self.patience_counter >= self.patience:
-                    if self.verbose:
-                        logger.info(f"Early stopping at epoch {epoch + 1}")
-                        logger.info(f"Best {self.monitor_metric}: {best_val_metric:.4f} at epoch {self.best_epoch + 1}")
-                    break
-
-        # Final best metric
-        final_metric = (
-            best_val_metric
-            if self.early_stopping
-            else val_metrics.get(self.monitor_metric, float("inf")) if val_metrics else float("inf")
-        )
+        # Save checkpoint
+        if self.checkpoint_dir:
+            self.save_checkpoint(is_best=True)
 
         return {
             "history": self.history,
-            "best_epoch": self.best_epoch,
-            "converged": self.patience_counter < self.patience,
-            "best_metric": final_metric,
+            "training_time": training_time,
+            "converged": True,
+            "train_metrics": train_metrics,
+            "val_metrics": val_metrics,
         }
 
-    def _evaluate_loader(self, dataloader, prefix: str = "") -> Dict[str, float]:
+    def evaluate(self, loader: BaseDataLoader) -> Dict[str, float]:
         """
-        Evaluate model on a dataloader.
+        Evaluate statistical model on data.
 
         Args:
-            dataloader: DataLoader to evaluate on
-            prefix: Prefix for metric names (e.g., "train_", "val_")
+            loader: DataLoader to evaluate on
 
         Returns:
-            Dictionary of computed metrics
+            Dictionary of metrics
         """
-        if dataloader is None:
-            return {}
+        # Iterate over loader (single iteration for full data)
+        for X, y in loader:
+            # Make predictions
+            y_pred = self.model.predict(X)
 
-        y_true_list = []
-        y_pred_list = []
+            # Compute metrics
+            return self._compute_metrics(y, y_pred)
 
-        # Collect predictions
-        for X_batch, y_batch in dataloader:
-            y_pred_batch = self.model.predict(X_batch)
-            y_true_list.append(y_batch)
-            y_pred_list.append(y_pred_batch)
-
-        # Concatenate all batches
-        y_true = np.concatenate(y_true_list, axis=0)
-        y_pred = np.concatenate(y_pred_list, axis=0)
-
-        # Compute metrics
-        return self._compute_metrics(y_true, y_pred, prefix)
+        # Should never reach here if loader is properly configured
+        return {}
 
     def _compute_metrics(self, y_true: np.ndarray, y_pred: np.ndarray, prefix: str = "") -> Dict[str, float]:
         """
-        Compute all configured metrics.
+        Compute metrics.
 
         Args:
             y_true: True values
@@ -272,9 +400,19 @@ class TrainingEngine:
         Returns:
             Dictionary of computed metrics
         """
-        results = {}
+        # Use configured metrics if available, otherwise use defaults
+        if self.metrics:
+            metrics_dict = self.metrics
+        else:
+            # Fallback to default metrics
+            metrics_dict = {"mape": mape, "rmse": rmse, "mae": mae}
 
-        for metric_name, metric_fn in self.metrics.items():
+        # Ensure same shape
+        y_true = y_true.ravel()
+        y_pred = y_pred.ravel()
+
+        results = {}
+        for metric_name, metric_fn in metrics_dict.items():
             try:
                 value = metric_fn(y_true, y_pred)
                 results[f"{prefix}{metric_name}"] = float(value)
@@ -284,120 +422,38 @@ class TrainingEngine:
 
         return results
 
-    def _log_metrics(self, epoch: int, train_metrics: Dict, val_metrics: Dict, epoch_time: float):
+    def _save_model_state(self, path: Path):
         """
-        Log metrics for current epoch.
+        Save statistical model via pickle.
 
         Args:
-            epoch: Current epoch number
-            train_metrics: Training metrics
-            val_metrics: Validation metrics
-            epoch_time: Time taken for epoch
+            path: Path to save model
         """
-        logger.info(f"Epoch {epoch + 1}/{self.max_epochs} - {epoch_time:.2f}s")
+        import pickle
 
-        # Log training metrics
-        for metric_name, value in train_metrics.items():
-            logger.info(f"  {metric_name}: {value:.4f}")
+        with open(path, "wb") as f:
+            pickle.dump(
+                {
+                    "model": self.model,
+                    "history": self.history,
+                },
+                f,
+            )
 
-        # Log validation metrics
-        for metric_name, value in val_metrics.items():
-            logger.info(f"  {metric_name}: {value:.4f}")
-
-        # Log metrics to MLflow
-        if self.mlflow_tracker:
-            try:
-                # Combine all metrics with prefixes
-                mlflow_metrics = {}
-                for metric_name, value in train_metrics.items():
-                    mlflow_metrics[f"train_{metric_name}"] = value
-                for metric_name, value in val_metrics.items():
-                    mlflow_metrics[f"val_{metric_name}"] = value
-
-                # Add epoch time
-                mlflow_metrics["epoch_time"] = epoch_time
-
-                # Log to MLflow with step
-                self.mlflow_tracker.log_metrics(mlflow_metrics, step=epoch)
-
-            except Exception as e:
-                logger.warning(f"Failed to log metrics to MLflow: {e}")
-
-    def evaluate_test(self) -> Dict[str, float]:
+    def load_checkpoint(self, path: Path):
         """
-        Evaluate model on test dataset.
-
-        Returns:
-            Dictionary of test metrics
-        """
-        if self.test_dataset is None:
-            raise ValueError("No test dataset provided")
-
-        if self.verbose:
-            logger.info("Evaluating on test set...")
-
-        test_metrics = self._evaluate_loader(self.test_dataset, prefix="test_")
-
-        if self.verbose:
-            logger.info("Test Results:")
-            for metric_name, value in sorted(test_metrics.items()):
-                logger.info(f"  {metric_name}: {value:.4f}")
-
-        # Log test metrics to MLflow
-        if self.mlflow_tracker:
-            try:
-                self.mlflow_tracker.log_metrics(test_metrics)
-
-                # Log predictions if configured
-                if self.mlflow_tracker.cfg.log_predictions:
-                    # Get predictions and true values
-                    y_pred = self.predict(self.test_dataset)
-                    y_true = []
-                    for X_batch, y_batch in self.test_dataset:
-                        if hasattr(y_batch, "numpy"):
-                            y_true.extend(y_batch.numpy().flatten())
-                        else:
-                            y_true.extend(y_batch.flatten() if hasattr(y_batch, "flatten") else y_batch)
-
-                    y_true = np.array(y_true)
-                    y_pred = y_pred.flatten() if hasattr(y_pred, "flatten") else y_pred
-
-                    # Ensure same length
-                    min_len = min(len(y_true), len(y_pred))
-                    y_true = y_true[:min_len]
-                    y_pred = y_pred[:min_len]
-
-                    # Log predictions with plots
-                    self.mlflow_tracker.log_predictions(y_true, y_pred, "test", plot=True)
-
-            except Exception as e:
-                logger.warning(f"Failed to log test results to MLflow: {e}")
-
-        return test_metrics
-
-    def predict(self, dataloader) -> np.ndarray:
-        """
-        Generate predictions for a dataloader.
+        Load statistical model from pickle file.
 
         Args:
-            dataloader: DataLoader to predict on
-
-        Returns:
-            Array of predictions
+            path: Path to load model from
         """
-        predictions = []
+        import pickle
 
-        for X_batch, _ in dataloader:
-            y_pred = self.model.predict(X_batch)
-            predictions.append(y_pred)
+        with open(path, "rb") as f:
+            checkpoint = pickle.load(f)
 
-        return np.concatenate(predictions, axis=0)
+        self.model = checkpoint["model"]
+        self.history = checkpoint.get("history", self.history)
 
-    def get_history(self) -> Dict[str, list]:
-        """
-        Get training history.
-
-        Returns:
-            Dictionary containing training history
-        """
-        return self.history
+        if self.verbose:
+            logger.info(f"Loaded model from {path}")

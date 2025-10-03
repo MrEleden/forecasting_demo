@@ -1,0 +1,58 @@
+# Full Feature Engineering Pipeline
+#
+# Combines both:
+# 1. StaticTimeSeriesPreprocessingPipeline (applied BEFORE splitting)
+# 2. StatisticalPreprocessingPipeline (applied AFTER splitting, fit on train)
+
+# ============================================================================
+# STATIC FEATURE ENGINEERING (Applied BEFORE splitting)
+# ============================================================================
+static:
+  _target_: ml_portfolio.data.preprocessing.StaticTimeSeriesPreprocessingPipeline
+
+  # Column names (must match your dataset)
+  date_column: date
+  group_columns: null  # e.g., ["store_id", "item_id"] for grouped time series
+  target_column: target
+
+  # Lag features (backward-looking, safe)
+  lag_features:
+    - 1
+    - 7
+    - 14
+    - 28
+
+  # Rolling window features (backward-looking with shift, safe)
+  rolling_windows:
+    - 7
+    - 14
+    - 30
+
+  # Date features (deterministic, safe)
+  date_features: true
+
+  # Cyclical encoding for periodic features (deterministic, safe)
+  cyclical_features:
+    - month
+    - dayofweek
+    - quarter
+
+# ============================================================================
+# STATISTICAL PREPROCESSING (Applied AFTER splitting, fit on train)
+# ============================================================================
+statistical:
+  _target_: ml_portfolio.data.preprocessing.StatisticalPreprocessingPipeline
+
+  steps:
+    - - feature_scaler  # name
+      - _target_: sklearn.preprocessing.StandardScaler
+        with_mean: true
+        with_std: true
+
+    - - target_scaler  # name (starts with "target_" so applied to y)
+      - _target_: sklearn.preprocessing.StandardScaler
+        with_mean: true
+        with_std: true
+
+# Note: Steps with names starting with "target_" are applied to y
+# All other steps are applied to X

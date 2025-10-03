@@ -1,0 +1,16 @@
+# Statistical Engine Configuration
+# For sklearn-style and statistical models (ARIMA, Prophet, RandomForest, etc.)
+# Trains in a single pass with model.fit()
+
+_target_: ml_portfolio.training.engine.StatisticalEngine
+
+# Logging
+verbose: true
+
+# These will be set by train.py:
+# - model: The model instance
+# - train_loader: Training data loader
+# - val_loader: Validation data loader
+# - test_loader: Test data loader
+# - mlflow_tracker: MLflow tracking (optional)
+# - checkpoint_dir: Directory to save checkpoints

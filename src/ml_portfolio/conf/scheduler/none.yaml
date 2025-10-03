@@ -1,0 +1,5 @@
+# No Scheduler Configuration
+# Use this when you don't want any learning rate scheduling
+
+# This is null - no scheduler will be used
+_target_: null
