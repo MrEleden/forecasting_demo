@@ -15,7 +15,10 @@
       "Bash(source:*)",
       "Bash(pip check)",
       "Bash(nvidia-smi:*)",
-      "Bash(pip uninstall:*)"
+      "Bash(pip uninstall:*)",
+      "Bash(find:*)",
+      "Bash(tree:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
