@@ -1,0 +1,68 @@
+# @package hydra.sweeper
+_target_: hydra_plugins.hydra_optuna_sweeper.optuna_sweeper.OptunaSweeper
+
+# Optimization direction
+direction: minimize  # Use 'maximize' for metrics like accuracy
+
+# Study configuration
+study_name: forecasting_optimization
+storage: null  # Use in-memory, or "sqlite:///optuna.db" for persistence
+
+# Sampler configuration
+sampler:
+  _target_: optuna.samplers.TPESampler
+  seed: 42
+  n_startup_trials: 10  # Random trials before TPE kicks in
+  consider_prior: true
+  prior_weight: 1.0
+  consider_magic_clip: true
+  consider_endpoints: false
+  n_ei_candidates: 24
+  multivariate: false
+  warn_independent_sampling: true
+
+# Number of trials
+n_trials: 50
+n_jobs: 1  # Number of parallel trials (use 1 for MLflow compatibility)
+
+# Jobs launcher (for parallel execution)
+# joblib_overrides:
+#   prefer: processes
+
+# Search space definition
+# Available parameter types:
+#   - choice: Categorical choice from list
+#   - range: Integer range [start, stop, step]
+#   - interval: Float range [start, stop]
+#   - int_interval: Integer range as floats
+
+params:
+  # Example: LSTM model hyperparameters
+  # model.hidden_size: choice(64, 128, 256, 512)
+  # model.num_layers: range(1, 5)  # 1, 2, 3, 4
+  # model.dropout: interval(0.0, 0.5)
+  # model.bidirectional: choice(true, false)
+  
+  # Example: Training hyperparameters
+  # training.learning_rate: interval(1e-5, 1e-2)
+  # training.batch_size: choice(16, 32, 64, 128)
+  # training.max_epochs: range(10, 101, 10)  # 10, 20, ..., 100
+  
+  # Example: Optimizer hyperparameters
+  # optimizer.weight_decay: interval(0.0, 0.1)
+  # optimizer.beta1: interval(0.8, 0.999)
+  # optimizer.beta2: interval(0.9, 0.999)
+  
+  # Example: Scheduler hyperparameters
+  # scheduler.patience: range(5, 21, 5)
+  # scheduler.factor: interval(0.1, 0.5)
+
+# Custom scorer (optional)
+# custom_search_space_extender: null
+
+# Pruner configuration (optional, for early stopping of trials)
+# pruner:
+#   _target_: optuna.pruners.MedianPruner
+#   n_startup_trials: 5
+#   n_warmup_steps: 10
+#   interval_steps: 1

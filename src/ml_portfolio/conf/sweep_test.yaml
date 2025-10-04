@@ -1,0 +1,55 @@
+# Simple Sweep Example Configuration
+# Test Hydra + Optuna + MLflow integration with a small sweep
+#
+# Usage:
+#   python -m ml_portfolio.training.train --config-name=sweep_test --multirun
+
+defaults:
+  - config  # Inherit from main config
+  - override hydra/sweeper: optuna  # Use Optuna sweeper
+  - override hydra/launcher: basic   # Use basic launcher (sequential)
+  - _self_
+
+# Enable MLflow tracking for sweep
+use_mlflow: true
+
+# Model selection (we'll sweep this)
+model: random_forest
+
+# Dataset
+dataset_factory: default
+
+# Feature engineering
+feature_engineering: none
+
+# Primary metric (minimize MAPE)
+primary_metric: mape
+
+# Hydra sweeper configuration (override the defaults)
+hydra:
+  sweeper:
+    # Optimization settings
+    direction: minimize
+    n_trials: 5  # Small number for testing
+    n_jobs: 1
+    
+    # Study settings
+    study_name: test_sweep
+    storage: null  # In-memory for quick test
+    
+    # Sampler
+    sampler:
+      _target_: optuna.samplers.TPESampler
+      seed: 42
+      n_startup_trials: 2
+    
+    # Search space - Random Forest hyperparameters
+    params:
+      model.n_estimators: choice(50, 100, 200)
+      model.max_depth: choice(5, 10, 15)
+      model.min_samples_split: choice(2, 5, 10)
+
+  # Sweep output directory
+  sweep:
+    dir: outputs/sweep_test/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: trial_${hydra.job.num}

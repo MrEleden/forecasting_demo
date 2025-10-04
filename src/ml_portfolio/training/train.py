@@ -18,20 +18,6 @@ import numpy as np
 from hydra.utils import get_original_cwd, instantiate
 from omegaconf import DictConfig, OmegaConf
 
-# Optional imports
-try:
-    import torch
-
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
-
-try:
-    import mlflow
-
-    MLFLOW_AVAILABLE = True
-except ImportError:
-    MLFLOW_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -212,14 +198,24 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     logger.info("Phase 6: Instantiating training engine...")
     logger.info("(Model-centric config: engine specified in model defaults)")
 
-    # Setup MLflow tracking (optional)
+    # Setup MLflow tracking with MLflowTracker (optional)
     mlflow_tracker = None
     if MLFLOW_AVAILABLE and cfg.get("use_mlflow", False):
-        mlflow.set_experiment(cfg.get("experiment_name", "forecasting"))
-        mlflow.start_run(run_name=cfg.get("run_name", None))
-        mlflow.log_params(OmegaConf.to_container(cfg, resolve=True))
-        mlflow_tracker = mlflow
-        logger.info("MLflow tracking enabled")
+        from ml_portfolio.utils.mlflow_utils import MLflowTracker
+
+        # Instantiate MLflowTracker with mlflow config
+        mlflow_tracker = MLflowTracker(cfg.mlflow)
+
+        # Start MLflow run with custom tags
+        run_tags = {
+            "model_type": cfg.model._target_.split(".")[-1],
+            "dataset": cfg.dataset_factory._target_.split(".")[-1],
+        }
+        mlflow_tracker.start_run(run_name=cfg.get("run_name", None), tags=run_tags)
+
+        # Log full configuration
+        mlflow_tracker.log_config(cfg)
+        logger.info("MLflow tracking enabled (using MLflowTracker)")
 
     # Create checkpoint directory
     checkpoint_dir = None
@@ -286,6 +282,10 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
         for metric_name, value in val_metrics.items():
             logger.info(f"  {metric_name}: {value:.4f}")
 
+        # Log validation metrics to MLflow
+        if mlflow_tracker:
+            mlflow_tracker.log_metrics(val_metrics)
+
     # ========================================================================
     # PHASE 9: TEST EVALUATION (Final, untouched until now!)
     # ========================================================================
@@ -307,9 +307,10 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     for metric_name, value in test_metrics.items():
         logger.info(f"  {metric_name}: {value:.4f}")
 
-    # Log to MLflow
+    # Log test metrics to MLflow (with 'test_' prefix)
     if mlflow_tracker:
-        mlflow.log_metrics({f"test_{k}": v for k, v in test_metrics.items()})
+        test_metrics_prefixed = {f"test_{k}": v for k, v in test_metrics.items()}
+        mlflow_tracker.log_metrics(test_metrics_prefixed)
 
     # ========================================================================
     # PHASE 10: SAVE RESULTS
@@ -336,17 +337,14 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
 
     # Close MLflow run
     if mlflow_tracker:
-        mlflow.end_run()
+        mlflow_tracker.end_run()
         logger.info("MLflow run closed")
 
     logger.info("=" * 80)
     logger.info("TRAINING PIPELINE COMPLETE!")
     logger.info("=" * 80)
 
-    # Return primary metric for hyperparameter optimization
-    primary_metric = cfg.get("primary_metric", "val_mape")
-    metric_value = val_metrics.get(primary_metric.replace("val_", ""), float("inf"))
-
+    # Return results (main function extracts metric for optimization)
     return results
 
 
@@ -356,22 +354,6 @@ def main(cfg: DictConfig) -> float:
     Main training entry point with Hydra configuration.
 
     The function returns the primary validation metric for hyperparameter optimization.
-
-    Example usage:
-        # Single run with default config
-        python -m ml_portfolio.training.train
-
-        # Single run with config overrides
-        python -m ml_portfolio.training.train model=arima dataset=walmart
-
-        # Multi-run experiments
-        python -m ml_portfolio.training.train -m model=arima,prophet dataset=walmart
-
-        # With hyperparameter overrides
-        python -m ml_portfolio.training.train model=lstm model.hidden_size=128 training.epochs=50
-
-        # Using config groups
-        python -m ml_portfolio.training.train model=lstm dataset=walmart engine=pytorch dataloader=pytorch
 
     Args:
         cfg: Hydra configuration object

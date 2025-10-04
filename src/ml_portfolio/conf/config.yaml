@@ -21,6 +21,7 @@ defaults:
   - feature_engineering: none   # Feature engineering (static + statistical)
   - model: random_forest        # Model (automatically includes dataloader + engine)
   - metrics: default            # Metrics configuration
+  - mlflow: default             # MLflow tracking configuration
   - _self_
 
 # You can still override model's defaults:
@@ -37,17 +38,17 @@ seed: 42
 log_level: INFO  # DEBUG, INFO, WARNING, ERROR
 verbose: true
 
-# MLflow tracking (optional)
+# MLflow tracking (optional - set to true to enable)
 use_mlflow: false
-experiment_name: ml_portfolio_forecasting
-run_name: null  # Auto-generated if null
 
 # Checkpointing
 save_checkpoints: true
 checkpoint_dir: null  # Auto-generated in outputs/ if null
 
-# Primary metric for optimization (used by Optuna)
-primary_metric: mape  # Will be prefixed with "val_" (e.g., val_mape)
+# Primary metric for optimization (used by Hydra sweeper/Optuna)
+# This metric is returned to the sweeper for optimization
+# Format: metric name without "val_" prefix (e.g., "mape" becomes "val_mape")
+primary_metric: mape
 
 # ============================================================================
 # FEATURE ENGINEERING CONFIGURATION

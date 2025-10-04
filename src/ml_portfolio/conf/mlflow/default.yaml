@@ -1,0 +1,27 @@
+# MLflow Tracking Configuration
+
+# Tracking settings
+tracking_uri: null  # Use default (file://mlruns) or set remote URI (e.g., http://localhost:5000)
+experiment_name: ml_portfolio_forecasting
+run_name: null  # Auto-generated if null (timestamp + model)
+
+# Logging options
+log_params: true
+log_metrics: true
+log_model: false  # Set to true to log model artifacts
+log_predictions: false  # Set to true to log predictions CSV and plots
+
+# Tags (metadata for organizing runs)
+tags:
+  project: ml_portfolio
+  environment: development
+
+# Auto-logging for supported frameworks
+enable_auto_logging: false
+auto_log_frameworks:
+  sklearn: false
+  pytorch: false
+
+# Model registry
+register_model: false
+model_name: null  # Auto-generated if null

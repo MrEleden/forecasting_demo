@@ -11,6 +11,12 @@ lightgbm>=4.0.0
 catboost>=1.2.0
 optuna>=2.10.0,<3.0.0
 
+# Hyperparameter optimization
+hydra-optuna-sweeper>=1.2.0
+
+# Experiment tracking
+mlflow>=2.0.0
+
 # Deep learning (optional - comment out if not needed)
 torch>=2.0.0
 
