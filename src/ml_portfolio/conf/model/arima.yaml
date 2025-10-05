@@ -1,20 +1,23 @@
+# @package _global_
+
 # ARIMA Model Configuration
 # Statistical time series model
-# Uses: SimpleDataLoader + StatisticalEngine
+# Dataloader and engine specified via defaults
 
 defaults:
   - /dataloader: simple
   - /engine: statistical
 
-# Model instantiation
-_target_: ml_portfolio.models.statistical.arima.ARIMAForecaster
+model:
+  # Model instantiation
+  _target_: ml_portfolio.models.statistical.arima.ARIMAForecaster
 
-# ARIMA parameters
-order: [1, 1, 1]  # (p, d, q)
-seasonal_order: [0, 0, 0, 0]  # (P, D, Q, s)
+  # ARIMA parameters
+  order: [1, 1, 1]  # (p, d, q)
+  seasonal_order: [0, 0, 0, 0]  # (P, D, Q, s)
 
-# Fitting options
-trend: null  # null, 'c', 't', 'ct'
-method: lbfgs  # Optimization method
-maxiter: 50
-suppress_warnings: true
+  # Fitting options
+  trend: null  # null, 'c', 't', 'ct'
+  method: lbfgs  # Optimization method
+  maxiter: 50
+  suppress_warnings: true

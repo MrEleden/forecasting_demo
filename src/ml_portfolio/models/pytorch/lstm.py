@@ -1,44 +1,43 @@
-"""
-LSTM implementation for time series forecasting.
+﻿"""
+LSTM forecasting model for time series.
+
+Clean implementation using PyTorchForecaster base class.
 """
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.preprocessing import StandardScaler
+from torch.utils.data import DataLoader, TensorDataset
 
 from ..base import PyTorchForecaster
 
 
-class LSTMCore(nn.Module):
-    """Core LSTM network."""
-
-    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.1):
-        super().__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout)
-        self.fc = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        lstm_out, _ = self.lstm(x)
-        output = self.fc(lstm_out[:, -1, :])
-        return output
-
-
 class LSTMForecaster(PyTorchForecaster):
-    """LSTM forecaster inheriting from PyTorchForecaster base class."""
+    """
+    LSTM-based time series forecaster.
+
+    Long Short-Term Memory network for sequential forecasting.
+
+    Args:
+        input_size: Number of input features
+        hidden_size: Number of hidden units in LSTM
+        num_layers: Number of LSTM layers
+        output_size: Number of output features
+        dropout: Dropout rate for regularization
+        bidirectional: Use bidirectional LSTM
+        device: Device to use ('cpu', 'cuda', 'auto')
+    """
 
     def __init__(
         self,
-        input_size=1,
-        hidden_size=64,
-        num_layers=2,
-        output_size=1,
-        dropout=0.2,
-        lr=0.001,
-        epochs=100,
-        batch_size=32,
-        device="auto",
+        input_size: int = 1,
+        hidden_size: int = 128,
+        num_layers: int = 2,
+        output_size: int = 1,
+        dropout: float = 0.2,
+        bidirectional: bool = False,
+        device: str = "auto",
         **kwargs,
     ):
         super().__init__(device=device, **kwargs)
@@ -47,113 +46,166 @@ class LSTMForecaster(PyTorchForecaster):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.output_size = output_size
-        self.dropout = dropout
-        self.lr = lr
-        self.epochs = epochs
-        self.batch_size = batch_size
+        self.dropout_rate = dropout
+        self.bidirectional = bidirectional
 
-        self.scaler_ = StandardScaler()
-        self.is_fitted_ = False
+        # LSTM layer
+        self.lstm = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0,
+            bidirectional=bidirectional,
+        )
 
-    def _validate_input(self, X, y=None):
-        """Validate and convert input data."""
+        # Output layer
+        lstm_output_size = hidden_size * 2 if bidirectional else hidden_size
+        self.fc = nn.Linear(lstm_output_size, output_size)
+
+        # Dropout
+        self.dropout = nn.Dropout(dropout)
+
+        # Move to device
+        self.to(self.device)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the LSTM network."""
+        lstm_out, (hidden, cell) = self.lstm(x)
+        last_output = lstm_out[:, -1, :]
+        last_output = self.dropout(last_output)
+        output = self.fc(last_output)
+        return output
+
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        epochs: int = 100,
+        batch_size: int = 32,
+        learning_rate: float = 0.001,
+        validation_split: float = 0.2,
+        verbose: bool = True,
+        **kwargs,
+    ) -> "LSTMForecaster":
+        """Fit the LSTM model."""
         if isinstance(X, pd.DataFrame):
             X = X.values
-        if isinstance(X, list):
-            X = np.array(X)
-
-        if y is not None:
-            if isinstance(y, pd.Series):
-                y = y.values
-            if isinstance(y, list):
-                y = np.array(y)
-            return X.astype(np.float32), y.astype(np.float32)
-
-        return X.astype(np.float32)
-
-    def _prepare_data(self, X, y=None):
-        """Convert numpy arrays to PyTorch tensors."""
-        X_tensor = torch.FloatTensor(X).to(self.device)
-
-        if y is not None:
-            y_tensor = torch.FloatTensor(y).to(self.device)
-            if len(y_tensor.shape) == 1:
-                y_tensor = y_tensor.unsqueeze(1)
-            return X_tensor, y_tensor
-
-        return X_tensor
-
-    def _check_is_fitted(self):
-        """Check if model is fitted."""
-        if not self.is_fitted_:
-            raise RuntimeError("Model must be fitted before making predictions")
-
-    def _create_model(self):
-        """Create the LSTM model."""
-        model = LSTMCore(
-            input_size=self.input_size,
-            hidden_size=self.hidden_size,
-            num_layers=self.num_layers,
-            output_size=self.output_size,
-            dropout=self.dropout,
-        )
-        return model.to(self.device)
-
-    def fit(self, X, y):
-        """Fit the LSTM model."""
-        X, y = self._validate_input(X, y)
-
-        if len(X.shape) == 3:
-            self.input_size = X.shape[2]
-        else:
-            X = X.reshape(X.shape[0], 1, X.shape[1])
-            self.input_size = X.shape[2]
-
-        X_scaled = self.scaler_.fit_transform(X.reshape(-1, X.shape[-1]))
-        X_scaled = X_scaled.reshape(X.shape)
-
-        self.model_ = self._create_model()
-        self.criterion_ = nn.MSELoss()
-        self.optimizer_ = torch.optim.Adam(self.model_.parameters(), lr=self.lr)
-
-        X_tensor, y_tensor = self._prepare_data(X_scaled, y)
-
-        self.model_.train()
-        for epoch in range(self.epochs):
-            for i in range(0, len(X_tensor), self.batch_size):
-                batch_X = X_tensor[i : i + self.batch_size]
-                batch_y = y_tensor[i : i + self.batch_size]
-
-                outputs = self.model_(batch_X)
-                loss = self.criterion_(outputs, batch_y)
-
-                self.optimizer_.zero_grad()
-                loss.backward()
-                self.optimizer_.step()
-
-            if (epoch + 1) % max(1, self.epochs // 10) == 0:
-                print(f"Epoch [{epoch+1}/{self.epochs}], Loss: {loss.item():.4f}")
-
-        self.is_fitted_ = True
-        return self
-
-    def predict(self, X):
-        """Make predictions using the fitted LSTM model."""
-        self._check_is_fitted()
-
-        X = self._validate_input(X)
+        if isinstance(y, (pd.DataFrame, pd.Series)):
+            y = y.values
 
         if len(X.shape) == 2:
             X = X.reshape(X.shape[0], 1, X.shape[1])
 
-        X_scaled = self.scaler_.transform(X.reshape(-1, X.shape[-1]))
-        X_scaled = X_scaled.reshape(X.shape)
+        if len(y.shape) == 1:
+            y = y.reshape(-1, 1)
 
-        X_tensor = self._prepare_data(X_scaled)
+        n_samples = X.shape[0]
+        n_val = int(n_samples * validation_split)
+        n_train = n_samples - n_val
 
-        self.model_.eval()
+        X_train, X_val = X[:n_train], X[n_train:]
+        y_train, y_val = y[:n_train], y[n_train:]
+
+        X_train_tensor = torch.FloatTensor(X_train).to(self.device)
+        y_train_tensor = torch.FloatTensor(y_train).to(self.device)
+        X_val_tensor = torch.FloatTensor(X_val).to(self.device) if n_val > 0 else None
+        y_val_tensor = torch.FloatTensor(y_val).to(self.device) if n_val > 0 else None
+
+        train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+        criterion = nn.MSELoss()
+        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+
+        self.train()
+        for epoch in range(epochs):
+            epoch_loss = 0.0
+            n_batches = 0
+
+            for batch_X, batch_y in train_loader:
+                outputs = self.forward(batch_X)
+                loss = criterion(outputs, batch_y)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                epoch_loss += loss.item()
+                n_batches += 1
+
+            avg_train_loss = epoch_loss / n_batches
+
+            if X_val_tensor is not None and (epoch + 1) % 10 == 0:
+                self.eval()
+                with torch.no_grad():
+                    val_outputs = self.forward(X_val_tensor)
+                    val_loss = criterion(val_outputs, y_val_tensor).item()
+                self.train()
+
+                if verbose:
+                    print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {val_loss:.4f}")
+            elif verbose and (epoch + 1) % 10 == 0:
+                print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}")
+
+        self.is_fitted = True
+        return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Make predictions with the fitted model."""
+        if isinstance(X, pd.DataFrame):
+            X = X.values
+
+        if len(X.shape) == 2:
+            X = X.reshape(X.shape[0], 1, X.shape[1])
+
+        X_tensor = torch.FloatTensor(X).to(self.device)
+
+        self.eval()
         with torch.no_grad():
-            predictions = self.model_(X_tensor)
-            predictions = predictions.cpu().numpy()
+            outputs = self.forward(X_tensor)
+            predictions = outputs.cpu().numpy()
 
-        return predictions.squeeze()
+        if predictions.shape[1] == 1:
+            predictions = predictions.ravel()
+
+        return predictions
+
+    def score(self, X: np.ndarray, y: np.ndarray) -> float:
+        """Calculate R^2 score on test data."""
+        from sklearn.metrics import r2_score
+
+        if isinstance(y, (pd.DataFrame, pd.Series)):
+            y = y.values
+        if len(y.shape) > 1:
+            y = y.ravel()
+
+        y_pred = self.predict(X)
+        return r2_score(y, y_pred)
+
+    def get_params(self, deep: bool = True) -> dict:
+        """Get model parameters."""
+        return {
+            "input_size": self.input_size,
+            "hidden_size": self.hidden_size,
+            "num_layers": self.num_layers,
+            "output_size": self.output_size,
+            "dropout": self.dropout_rate,
+            "bidirectional": self.bidirectional,
+            "device": self.device,
+        }
+
+    def set_params(self, **params) -> "LSTMForecaster":
+        """Set model parameters."""
+        for key, value in params.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+        return self
+
+    def __repr__(self) -> str:
+        """String representation."""
+        return (
+            f"LSTMForecaster(input_size={self.input_size}, "
+            f"hidden_size={self.hidden_size}, num_layers={self.num_layers}, "
+            f"output_size={self.output_size})"
+        )

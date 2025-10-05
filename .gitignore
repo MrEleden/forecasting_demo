@@ -215,6 +215,7 @@ outputs/
 mlruns/
 .neptune/
 .wandb/
+checkpoints/
 
 # Jupyter notebooks output
 *-checkpoint.ipynb

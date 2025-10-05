@@ -1,0 +1,31 @@
+# Walmart Dataset Factory Configuration
+# Creates train/val/test dataset splits from Walmart sales data
+# Static feature engineering happens BEFORE splitting (safe, deterministic)
+# Statistical preprocessing happens AFTER splitting (fit on train)
+
+_target_: ml_portfolio.data.dataset_factory.DatasetFactory
+
+# Data source
+data_path: projects/retail_sales_walmart/data/raw/Walmart.csv
+
+# Column specifications
+target_column: Weekly_Sales  # Sales prediction target
+feature_columns: null  # Use all columns except target (Store, Date, Holiday_Flag, Temperature, Fuel_Price, CPI, Unemployment)
+timestamp_column: Date  # Date column for time series
+
+# Split ratios (must sum to 1.0)
+train_ratio: 0.7
+val_ratio: 0.15
+test_ratio: 0.15
+
+# Static feature engineering (applied BEFORE splitting)
+# This is passed from cfg.feature_engineering.static in train.py
+static_feature_engineer: ${feature_engineering.static}
+
+# Note:
+# - Weekly_Sales is the target variable
+# - Date column will be used for temporal ordering and feature extraction
+# - Store is a categorical feature (can be used for grouping)
+# - Features: Holiday_Flag, Temperature, Fuel_Price, CPI, Unemployment
+# - Static features are applied BEFORE splitting (safe, no leakage)
+# - Statistical preprocessing happens AFTER splitting using StatisticalPreprocessingPipeline

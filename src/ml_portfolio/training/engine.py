@@ -60,6 +60,7 @@ class BaseEngine(ABC):
         self.checkpoint_dir = checkpoint_dir
         self.verbose = verbose
         self.metrics = metrics or {}
+        self.preprocessing_pipeline = kwargs.get("preprocessing_pipeline", None)
 
         # Training history
         self.history = {"train_metrics": [], "val_metrics": [], "test_metrics": [], "epoch_times": []}
@@ -140,7 +141,7 @@ class BaseEngine(ABC):
         if hasattr(loader, "__len__"):
             try:
                 descriptions.append(f"{len(loader)} batches")
-            except:
+            except Exception:
                 pass
 
         # Check if it's a known type
@@ -366,6 +367,67 @@ class StatisticalEngine(BaseEngine):
             "train_metrics": train_metrics,
             "val_metrics": val_metrics,
         }
+
+    def test(self) -> Dict[str, float]:
+        """
+        Evaluate model on test set with inverse transform for interpretable metrics.
+
+        Returns:
+            Test metrics dictionary
+        """
+        if self.test_loader is None:
+            raise ValueError("No test loader provided")
+
+        if self.verbose:
+            logger.info("Evaluating on test set...")
+
+        # Iterate over loader (single iteration for full data)
+        for X, y in self.test_loader:
+            # Make predictions on scaled data
+            y_pred = self.model.predict(X)
+
+            # Apply inverse transform if preprocessing pipeline is available
+            if self.preprocessing_pipeline is not None:
+                try:
+                    if self.verbose:
+                        logger.info(
+                            f"Before inverse: y range=[{y.min():.4f}, {y.max():.4f}], "
+                            f"y_pred range=[{y_pred.min():.4f}, {y_pred.max():.4f}]"
+                        )
+
+                    y_true_original = self.preprocessing_pipeline.inverse_transform_target(y)
+                    y_pred_original = self.preprocessing_pipeline.inverse_transform_target(y_pred)
+
+                    if self.verbose:
+                        logger.info(
+                            f"After inverse: y range=[{y_true_original.min():.2f}, "
+                            f"{y_true_original.max():.2f}], "
+                            f"y_pred range=[{y_pred_original.min():.2f}, "
+                            f"{y_pred_original.max():.2f}]"
+                        )
+                        logger.info("Applied inverse transform to predictions and targets")
+
+                    # Compute metrics on original scale
+                    metrics = self._compute_metrics(y_true_original, y_pred_original)
+                except Exception as e:
+                    logger.warning(f"Failed to apply inverse transform: {e}. Using scaled values.")
+                    # Fallback to scaled metrics
+                    metrics = self._compute_metrics(y, y_pred)
+            else:
+                # No preprocessing pipeline, compute on current scale
+                metrics = self._compute_metrics(y, y_pred)
+
+            self.history["test_metrics"].append(metrics)
+
+            if self.verbose:
+                logger.info("Test metrics:")
+                for metric_name, value in metrics.items():
+                    logger.info(f"  {metric_name}: {value:.4f}")
+
+            return metrics
+
+        # Should never reach here if loader is properly configured
+        return {}
 
     def evaluate(self, loader: BaseDataLoader) -> Dict[str, float]:
         """

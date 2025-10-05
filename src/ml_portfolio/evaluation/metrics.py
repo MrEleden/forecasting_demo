@@ -9,6 +9,112 @@ from typing import Dict
 
 import numpy as np
 
+# ============================================================================
+# Core Metric Functions (used by classes and directly importable)
+# ============================================================================
+
+
+def mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """
+    Mean Absolute Error.
+
+    Args:
+        y_true: Ground truth values
+        y_pred: Predicted values
+
+    Returns:
+        MAE value
+    """
+    return float(np.mean(np.abs(y_true - y_pred)))
+
+
+def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """
+    Root Mean Squared Error.
+
+    Args:
+        y_true: Ground truth values
+        y_pred: Predicted values
+
+    Returns:
+        RMSE value
+    """
+    return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+
+
+def mape(y_true: np.ndarray, y_pred: np.ndarray, epsilon: float = 1e-8) -> float:
+    """
+    Mean Absolute Percentage Error.
+
+    Args:
+        y_true: Ground truth values
+        y_pred: Predicted values
+        epsilon: Small value to avoid division by zero
+
+    Returns:
+        MAPE value (as percentage)
+    """
+    mask = np.abs(y_true) > epsilon
+    return float(np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100)
+
+
+def smape(y_true: np.ndarray, y_pred: np.ndarray, epsilon: float = 1e-8) -> float:
+    """
+    Symmetric Mean Absolute Percentage Error.
+
+    Args:
+        y_true: Ground truth values
+        y_pred: Predicted values
+        epsilon: Small value to avoid division by zero
+
+    Returns:
+        SMAPE value (as percentage)
+    """
+    denominator = (np.abs(y_true) + np.abs(y_pred)) / 2.0
+    mask = denominator > epsilon
+    return float(np.mean(np.abs(y_true[mask] - y_pred[mask]) / denominator[mask]) * 100)
+
+
+def directional_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """
+    Directional accuracy - percentage of correct direction predictions.
+
+    Args:
+        y_true: Ground truth values
+        y_pred: Predicted values
+
+    Returns:
+        Directional accuracy (0-100%)
+    """
+    if len(y_true) < 2:
+        return np.nan
+
+    true_direction = np.diff(y_true) > 0
+    pred_direction = np.diff(y_pred) > 0
+    return float(np.mean(true_direction == pred_direction) * 100)
+
+
+def mase(y_true: np.ndarray, y_pred: np.ndarray, y_train: np.ndarray, seasonal_period: int = 1) -> float:
+    """
+    Mean Absolute Scaled Error.
+
+    Args:
+        y_true: Ground truth values
+        y_pred: Predicted values
+        y_train: Training data for scaling
+        seasonal_period: Seasonal period for naive forecast
+
+    Returns:
+        MASE value
+    """
+    mae_forecast = np.mean(np.abs(y_true - y_pred))
+    mae_naive = np.mean(np.abs(np.diff(y_train, n=seasonal_period)))
+
+    if mae_naive == 0:
+        return np.nan
+
+    return float(mae_forecast / mae_naive)
+
 
 # Hydra-compatible metric classes
 class BaseMetric:

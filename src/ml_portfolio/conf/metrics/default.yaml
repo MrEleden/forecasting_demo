@@ -8,16 +8,17 @@ primary_metric: mape  # Options: mape, rmse, mae
 minimize: true
 
 # List of metrics to compute
-# Each metric should be a callable from ml_portfolio.evaluation.metrics
+# Each metric is instantiated as a class from ml_portfolio.evaluation.metrics
 metrics:
-  - _target_: ml_portfolio.evaluation.metrics.mape
-    _partial_: true
+  - _target_: ml_portfolio.evaluation.metrics.MAPEMetric
+    name: mape
+    epsilon: 1e-8
 
-  - _target_: ml_portfolio.evaluation.metrics.rmse
-    _partial_: true
+  - _target_: ml_portfolio.evaluation.metrics.RMSEMetric
+    name: rmse
 
-  - _target_: ml_portfolio.evaluation.metrics.mae
-    _partial_: true
+  - _target_: ml_portfolio.evaluation.metrics.MAEMetric
+    name: mae
 
-# Note: _partial_: true creates a partial function that will be called with (y_true, y_pred)
-# The engine will iterate through this list and compute all metrics
+# Note: Each metric class has a __call__ method that takes (y_true, y_pred)
+# The engine will instantiate these classes and call them as: metric_instance(y_true, y_pred)

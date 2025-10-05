@@ -23,7 +23,7 @@ class BaseForecaster(ABC):
     This class defines only the essential interface that all forecasting models must implement.
     """
 
-    def __init__(self, dataloader_class=None, training_class=None, **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize base forecaster with data loading and training strategies.
 
@@ -32,8 +32,7 @@ class BaseForecaster(ABC):
             training_class: Class responsible for training logic
             **kwargs: Additional parameters for subclasses
         """
-        self.dataloader_class = dataloader_class
-        self.training_class = training_class
+
         self.is_fitted = False
 
     @abstractmethod
@@ -134,10 +133,10 @@ class PyTorchForecaster(BaseForecaster, nn.Module):
             y = y.values
 
         X_tensor = torch.FloatTensor(X).to(self.device)
-        y_tensor = torch.FloatTensor(y).to(self.device)
+        _ = torch.FloatTensor(y).to(self.device)  # y_tensor for future use
 
         # Call forward pass (this is where subclasses will implement their training logic)
-        outputs = self.forward(X_tensor)
+        _ = self.forward(X_tensor)  # outputs for future use
 
         # This is a basic implementation - subclasses should override this method
         # to implement proper training loops, loss calculation, backpropagation, etc.

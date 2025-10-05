@@ -9,9 +9,9 @@
 static:
   _target_: ml_portfolio.data.preprocessing.StaticTimeSeriesPreprocessingPipeline
 
-  date_column: date
+  date_column: Date
   group_columns: null
-  target_column: target
+  target_column: Weekly_Sales
 
   lag_features:
     - 1

@@ -6,7 +6,6 @@ quantile losses, pinball loss, and SMAPE.
 """
 
 import numpy as np
-from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

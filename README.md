@@ -132,6 +132,20 @@ Each run generates:
 - **Artifacts**: Model files, predictions CSV
 - **Logs**: Comprehensive training logs
 
+## 🧹 Cleanup
+
+Remove stored training runs to free up disk space:
+
+```bash
+# Preview what will be deleted
+python clean_runs.py --dry-run
+
+# Clean all runs (MLflow, Hydra outputs, checkpoints)
+python clean_runs.py
+
+# See full documentation: docs/CLEANUP.md
+```
+
 ## 🔬 Development
 
 > **📚 Setup**: See [Setup Guide](docs/SETUP.md) for development environment setup and requirements.

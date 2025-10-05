@@ -1,0 +1,38 @@
+# @package _global_
+
+# Prophet Model Configuration
+# Facebook's forecasting library for seasonality and holidays
+# Great for interpretable forecasts
+
+defaults:
+  - /dataloader: simple
+  - /engine: statistical
+
+model:
+  # Model instantiation
+  _target_: ml_portfolio.models.statistical.prophet.ProphetForecaster
+
+  # Growth
+  growth: linear  # 'linear' or 'logistic'
+
+  # Seasonality
+  yearly_seasonality: auto  # True, False, or 'auto'
+  weekly_seasonality: auto
+  daily_seasonality: false  # Usually false for weekly/daily data
+
+  # Changepoints (trend changes)
+  n_changepoints: 25
+  changepoint_range: 0.8  # Use 80% of data for changepoint detection
+  changepoint_prior_scale: 0.05  # Flexibility (lower = less flexible)
+
+  # Seasonality strength
+  seasonality_prior_scale: 10.0  # Higher = stronger seasonality
+  seasonality_mode: additive  # 'additive' or 'multiplicative'
+
+  # Holidays
+  holidays_prior_scale: 10.0  # Strength of holiday effects
+
+  # Uncertainty
+  mcmc_samples: 0  # 0 for MAP estimation, >0 for full Bayesian
+  uncertainty_samples: 1000
+  interval_width: 0.8  # 80% confidence interval

@@ -1,0 +1,63 @@
+# Walmart-Specific Configuration
+# Optimized settings for Walmart sales forecasting
+#
+# This config sets all the right defaults for Walmart dataset training
+# Usage: python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart
+
+defaults:
+  - dataset_factory: walmart          # Walmart dataset with Weekly_Sales target
+  - feature_engineering: walmart_full  # Static features optimized for Walmart
+  - model: random_forest               # Start with Random Forest (good baseline)
+  - metrics: default                   # Standard metrics (MAPE, RMSE, MAE)
+  - _self_
+
+# ============================================================================
+# GLOBAL SETTINGS
+# ============================================================================
+seed: 42
+log_level: INFO
+verbose: true
+
+# ============================================================================
+# MLFLOW TRACKING (Optional)
+# ============================================================================
+use_mlflow: false
+experiment_name: walmart_sales_forecasting
+run_name: null  # Auto-generated if null
+
+# ============================================================================
+# CHECKPOINTING
+# ============================================================================
+save_checkpoints: true
+checkpoint_dir: null  # Auto-generated in outputs/ if null
+
+# ============================================================================
+# METRICS
+# ============================================================================
+primary_metric: mape  # Primary metric for optimization (lower is better)
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# Walmart Dataset:
+# - Target: Weekly_Sales (store sales per week)
+# - Features: Store, Date, Holiday_Flag, Temperature, Fuel_Price, CPI, Unemployment
+# - Temporal ordering: Weekly data from 2010-2012
+# - Recommended models: Random Forest, XGBoost, LSTM
+#
+# Feature Engineering:
+# - walmart_static: Lag features + rolling windows + date features (no scaling)
+# - walmart_full: Same as walmart_static but with StandardScaler (for neural nets)
+#
+# Quick Commands:
+#   # Random Forest (recommended starting point)
+#   python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart
+#
+#   # With full feature engineering (scaled features)
+#   python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart feature_engineering=walmart_full
+#
+#   # Different model
+#   python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart model=lstm
+#
+#   # Multi-run comparison
+#   python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart -m model=random_forest,arima

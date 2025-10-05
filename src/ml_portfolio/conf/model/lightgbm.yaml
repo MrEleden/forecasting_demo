@@ -1,0 +1,40 @@
+# @package _global_
+
+# LightGBM Model Configuration
+# Gradient boosting for time series forecasting
+# Top performer in Kaggle competitions - optimized for speed and accuracy
+
+defaults:
+  - /dataloader: simple
+  - /engine: statistical
+
+model:
+  # Model instantiation
+  _target_: ml_portfolio.models.statistical.lightgbm.LightGBMForecaster
+
+  # Core parameters
+  n_estimators: 500
+  learning_rate: 0.05
+  max_depth: 8
+  num_leaves: 31
+
+  # Child constraints
+  min_child_samples: 20
+  min_child_weight: 0.001
+
+  # Sampling
+  subsample: 0.8
+  subsample_freq: 1
+  colsample_bytree: 0.8
+
+  # Regularization
+  reg_alpha: 0.1  # L1 regularization
+  reg_lambda: 0.1  # L2 regularization
+
+  # Performance
+  n_jobs: -1  # Use all CPU cores
+  random_state: 42
+  verbose: -1  # Suppress warnings
+
+  # Early stopping (configured with validation set)
+  early_stopping_rounds: 50

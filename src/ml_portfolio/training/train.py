@@ -121,7 +121,6 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     set_seed(cfg.get("seed", 42))
 
     logger.info("Phase 0-1: Setup complete")
-
     # ========================================================================
     # PHASE 2: DATA LOADING + STATIC FEATURE ENGINEERING
     # ========================================================================
@@ -173,19 +172,14 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     # PHASE 4: INSTANTIATE MODEL
     # ========================================================================
     logger.info("Phase 4: Instantiating model...")
-
-    # Create model (model config includes dataloader and engine via defaults)
+    logger.info(f"Model configuration:\n{OmegaConf.to_yaml(cfg)}")
     model = instantiate(cfg.model)
     logger.info(f"Model: {type(model).__name__}")
-
     # ========================================================================
-    # PHASE 5: CREATE DATALOADERS + INSTANTIATE METRICS
+    # PHASE 5: INSTANTIATE DATALOADERS + INSTANTIATE METRICS
     # ========================================================================
     logger.info("Phase 5: Creating dataloaders and instantiating metrics...")
 
-    # Instantiate dataloader class based on config
-    # Model-centric: model config uses "defaults: [/dataloader: pytorch]"
-    # The "/" prefix merges dataloader config at root level (cfg.dataloader)
     train_loader = instantiate(cfg.dataloader, dataset=train_dataset)
     val_loader = instantiate(cfg.dataloader, dataset=val_dataset)
     test_loader = instantiate(cfg.dataloader, dataset=test_dataset)
@@ -218,13 +212,40 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
         mlflow.set_experiment(cfg.get("experiment_name", "forecasting"))
         mlflow.start_run(run_name=cfg.get("run_name", None))
         mlflow.log_params(OmegaConf.to_container(cfg, resolve=True))
+
+        # Log additional metadata as tags for MLflow UI
+        # Extract model name from config
+        model_name = "Unknown"
+        if hasattr(cfg, "model") and hasattr(cfg.model, "_target_"):
+            model_target = cfg.model._target_
+            model_name = model_target.split(".")[-1].replace("Forecaster", "").replace("Regressor", "")
+
+        # Extract dataset name
+        dataset_name = cfg.get("dataset_name", None)
+        if not dataset_name and hasattr(cfg, "dataset_factory"):
+            # Extract from data path
+            data_path = cfg.dataset_factory.get("data_path", "")
+            if data_path:
+                dataset_name = Path(data_path).stem  # e.g., 'Walmart' from 'Walmart.csv'
+
+        # Set description
+        description = cfg.get("description", f"{model_name} forecasting on {dataset_name or 'time series'} data")
+
+        # Log as MLflow tags (visible in UI)
+        mlflow.set_tag("mlflow.runName", f"{model_name}_{dataset_name or 'run'}")
+        mlflow.set_tag("model_type", model_name)
+        mlflow.set_tag("dataset", dataset_name or "unknown")
+        mlflow.set_tag("description", description)
+        mlflow.set_tag("mlflow.note.content", description)  # Shows in Description column
+
         mlflow_tracker = mlflow
         logger.info("MLflow tracking enabled")
 
     # Create checkpoint directory
     checkpoint_dir = None
     if cfg.get("save_checkpoints", True):
-        checkpoint_dir = Path(get_original_cwd()) / "checkpoints" / cfg.get("run_name", "default")
+        run_name = cfg.get("run_name") or "default"  # Handle None case
+        checkpoint_dir = Path(get_original_cwd()) / "checkpoints" / run_name
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Checkpoints will be saved to: {checkpoint_dir}")
 
@@ -251,6 +272,7 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
         "checkpoint_dir": checkpoint_dir,
         "verbose": cfg.get("verbose", True),
         "metrics": metrics_dict,  # Pass metrics dictionary
+        "preprocessing_pipeline": statistical_pipeline,  # Pass pipeline for inverse transform
     }
 
     # Add optimizer and scheduler for PyTorch engines
@@ -259,15 +281,22 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     if scheduler is not None:
         engine_kwargs["scheduler"] = scheduler
 
-    engine = instantiate(cfg.engine, **engine_kwargs)
+    # Get engine config (check root level first, then model level)
+    if "engine" in cfg and cfg.engine is not None:
+        engine_cfg = cfg.engine
+    elif "engine" in cfg.model and cfg.model.engine is not None:
+        engine_cfg = cfg.model.engine
+    else:
+        raise ValueError("No engine configured! Add engine to config defaults")
+
+    engine = instantiate(engine_cfg, **engine_kwargs)
     logger.info(f"Engine: {type(engine).__name__}")
 
     # ========================================================================
+    # ========================================================================
     # PHASE 7: TRAINING
     # ========================================================================
-    logger.info("=" * 80)
     logger.info("Phase 7: Training...")
-    logger.info("=" * 80)
 
     training_results = engine.train()
 
@@ -277,9 +306,7 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     # ========================================================================
     # PHASE 8: VALIDATION EVALUATION
     # ========================================================================
-    logger.info("=" * 80)
     logger.info("Phase 8: Validation evaluation...")
-    logger.info("=" * 80)
 
     val_metrics = training_results.get("val_metrics", {})
     if val_metrics:
@@ -289,9 +316,7 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     # ========================================================================
     # PHASE 9: TEST EVALUATION (Final, untouched until now!)
     # ========================================================================
-    logger.info("=" * 80)
     logger.info("Phase 9: TEST EVALUATION (final holdout set)")
-    logger.info("=" * 80)
 
     # NOW we can preprocess test set (using fitted statistical pipeline)
     if statistical_pipeline is not None:
@@ -300,6 +325,9 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
 
     # Recreate test loader with preprocessed data
     test_loader = instantiate(cfg.dataloader, dataset=test_dataset)
+
+    # Update engine's test loader with preprocessed version
+    engine.test_loader = test_loader
 
     # Evaluate on test set
     test_metrics = engine.test()
@@ -314,15 +342,33 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     # ========================================================================
     # PHASE 10: SAVE RESULTS
     # ========================================================================
-    logger.info("=" * 80)
     logger.info("Phase 10: Saving results...")
-    logger.info("=" * 80)
 
     # Save final model
     if checkpoint_dir:
         final_model_path = checkpoint_dir / "final_model.pkl"
         engine.save_checkpoint(final_model_path, is_best=True)
         logger.info(f"Saved final model to: {final_model_path}")
+
+        # Log model to MLflow (populates "Models" column)
+        if mlflow_tracker:
+            try:
+                # Extract model name for registration
+                model_name = "Unknown"
+                if hasattr(cfg, "model") and hasattr(cfg.model, "_target_"):
+                    model_target = cfg.model._target_
+                    model_name = model_target.split(".")[-1].replace("Forecaster", "").replace("Regressor", "")
+
+                # Log the model artifact
+                mlflow.log_artifact(str(final_model_path), artifact_path="model")
+
+                # Register model (optional - creates versioned model in Model Registry)
+                # Uncomment to enable model registry:
+                # mlflow.register_model(f"runs:/{mlflow.active_run().info.run_id}/model", model_name)
+
+                logger.info("Logged model artifact to MLflow")
+            except Exception as e:
+                logger.warning(f"Failed to log model to MLflow: {e}")
 
     # Compile results
     results = {
@@ -345,12 +391,12 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
 
     # Return primary metric for hyperparameter optimization
     primary_metric = cfg.get("primary_metric", "val_mape")
-    metric_value = val_metrics.get(primary_metric.replace("val_", ""), float("inf"))
+    _ = val_metrics.get(primary_metric.replace("val_", ""), float("inf"))  # metric_value
 
     return results
 
 
-@hydra.main(version_base=None, config_path="../../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> float:
     """
     Main training entry point with Hydra configuration.

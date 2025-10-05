@@ -68,6 +68,56 @@ class StatisticalPreprocessingPipeline:
         """Fit and transform in one step."""
         return self.fit(dataset).transform(dataset)
 
+    def inverse_transform_target(self, y: np.ndarray) -> np.ndarray:
+        """
+        Inverse transform target values back to original scale.
+
+        Args:
+            y: Transformed target values
+
+        Returns:
+            Target values in original scale
+        """
+        if not self.is_fitted:
+            raise RuntimeError("Pipeline not fitted. Call fit() first.")
+
+        # Apply inverse transforms in reverse order
+        y_inv = y.copy()
+
+        # Ensure we start with the correct shape
+        if y_inv.ndim == 1:
+            y_inv = y_inv.reshape(-1, 1)
+
+        for name, transformer in reversed(self.steps):
+            if name.startswith("target_"):
+                if hasattr(transformer, "inverse_transform"):
+                    y_inv = transformer.inverse_transform(y_inv)
+
+        # Return as 1D array
+        return y_inv.ravel()
+
+    def inverse_transform_features(self, X: np.ndarray) -> np.ndarray:
+        """
+        Inverse transform features back to original scale.
+
+        Args:
+            X: Transformed features
+
+        Returns:
+            Features in original scale
+        """
+        if not self.is_fitted:
+            raise RuntimeError("Pipeline not fitted. Call fit() first.")
+
+        # Apply inverse transforms in reverse order
+        X_inv = X.copy()
+        for name, transformer in reversed(self.steps):
+            if not name.startswith("target_"):
+                if hasattr(transformer, "inverse_transform"):
+                    X_inv = transformer.inverse_transform(X_inv)
+
+        return X_inv
+
 
 class StaticTimeSeriesPreprocessingPipeline:
     """
@@ -120,7 +170,8 @@ class StaticTimeSeriesPreprocessingPipeline:
 
     def _add_date_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add deterministic date features."""
-        date_col = pd.to_datetime(df[self.date_column])
+        # Use dayfirst=True to handle dd-mm-yyyy format (common in many datasets)
+        date_col = pd.to_datetime(df[self.date_column], dayfirst=True, format="mixed")
 
         if self.date_features:
             df["year"] = date_col.dt.year

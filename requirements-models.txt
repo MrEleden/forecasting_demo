@@ -1,0 +1,11 @@
+# ML Model Requirements
+# Gradient boosting and statistical forecasting models
+
+# Core ML libraries
+lightgbm>=4.0.0
+xgboost>=2.0.0
+catboost>=1.2.0
+
+# Statistical forecasting
+prophet>=1.1.0
+statsmodels>=0.14.0

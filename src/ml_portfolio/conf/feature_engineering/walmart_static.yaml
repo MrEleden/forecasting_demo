@@ -1,0 +1,59 @@
+# Walmart Static-Only Feature Engineering
+#
+# Only static features, no statistical preprocessing
+# Best for tree-based models like Random Forest that don't need scaling
+#
+# Tailored for Walmart dataset with Weekly_Sales as target
+
+# ============================================================================
+# STATIC FEATURE ENGINEERING (Applied BEFORE splitting)
+# ============================================================================
+static:
+  _target_: ml_portfolio.data.preprocessing.StaticTimeSeriesPreprocessingPipeline
+
+  # Column names (must match Walmart dataset)
+  date_column: Date
+  group_columns: [Store]  # Group by Store for store-specific features
+  target_column: Weekly_Sales
+
+  # Lag features (backward-looking, safe)
+  # Weekly data - use weekly lags
+  lag_features:
+    - 1   # Previous week
+    - 2   # 2 weeks ago
+    - 4   # 1 month ago
+    - 8   # 2 months ago
+    - 13  # Quarter ago
+    - 26  # Half year ago
+    - 52  # Year ago (seasonal)
+
+  # Rolling window features (backward-looking with shift, safe)
+  # Calculate rolling statistics
+  rolling_windows:
+    - 4   # 1 month rolling
+    - 8   # 2 months rolling
+    - 13  # Quarter rolling
+    - 26  # Half year rolling
+    - 52  # Year rolling
+
+  # Date features (deterministic, safe)
+  date_features: true
+
+  # Cyclical encoding for periodic features (deterministic, safe)
+  # Important for weekly seasonality and yearly patterns
+  cyclical_features:
+    - month        # Monthly seasonality
+    - dayofweek    # Day of week patterns
+    - quarter      # Quarterly patterns
+    - week         # Week of year (52 weeks)
+
+# ============================================================================
+# STATISTICAL PREPROCESSING (Applied AFTER splitting, fit on train)
+# ============================================================================
+statistical: null  # No statistical preprocessing (good for Random Forest)
+
+# Note:
+# - Tree-based models (Random Forest, XGBoost) work better without scaling
+# - Store-specific lags and rolling windows capture store-level patterns
+# - Seasonal features (week, month, quarter) capture yearly patterns
+# - Holiday_Flag, Temperature, Fuel_Price, CPI, Unemployment are already in the data
