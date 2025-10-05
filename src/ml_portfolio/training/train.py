@@ -33,6 +33,13 @@ try:
 except ImportError:
     MLFLOW_AVAILABLE = False
 
+try:
+    import optuna
+
+    OPTUNA_AVAILABLE = True
+except ImportError:
+    OPTUNA_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -231,12 +238,35 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
         # Set description
         description = cfg.get("description", f"{model_name} forecasting on {dataset_name or 'time series'} data")
 
+        # Detect if running under Optuna and get trial info
+        trial_number = None
+        if OPTUNA_AVAILABLE and cfg.get("use_optuna", False):
+            try:
+                from hydra.core.global_hydra import GlobalHydra
+
+                hydra_cfg = GlobalHydra.instance().hydra
+                if hydra_cfg and hasattr(hydra_cfg, "sweeper") and hasattr(hydra_cfg.sweeper, "trial"):
+                    trial = hydra_cfg.sweeper.trial
+                    trial_number = trial.number
+            except (AttributeError, ImportError):
+                pass
+
+        # Build run name with trial number if available
+        run_name_base = f"{model_name}_{dataset_name or 'run'}"
+        if trial_number is not None:
+            run_name_base += f"_trial_{trial_number}"
+
         # Log as MLflow tags (visible in UI)
-        mlflow.set_tag("mlflow.runName", f"{model_name}_{dataset_name or 'run'}")
+        mlflow.set_tag("mlflow.runName", run_name_base)
         mlflow.set_tag("model_type", model_name)
         mlflow.set_tag("dataset", dataset_name or "unknown")
         mlflow.set_tag("description", description)
         mlflow.set_tag("mlflow.note.content", description)  # Shows in Description column
+
+        # Add Optuna-specific tags if in optimization
+        if trial_number is not None:
+            mlflow.set_tag("optuna_trial", trial_number)
+            mlflow.set_tag("optuna_optimization", "true")
 
         mlflow_tracker = mlflow
         logger.info("MLflow tracking enabled")
@@ -312,6 +342,42 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     if val_metrics:
         for metric_name, value in val_metrics.items():
             logger.info(f"  {metric_name}: {value:.4f}")
+
+    # Report to Optuna for pruning (if running under Optuna)
+    if OPTUNA_AVAILABLE and hasattr(cfg, "hydra") and cfg.get("use_optuna", False):
+        try:
+            # Get primary metric from validation set for reporting
+            primary_metric = cfg.get("primary_metric", "MAPE")
+            metric_value = (
+                val_metrics.get(primary_metric)
+                or val_metrics.get(f"{primary_metric}Metric")
+                or val_metrics.get(primary_metric.upper())
+                or val_metrics.get(primary_metric.lower())
+                or float("inf")
+            )
+
+            # Try to get trial from Hydra Optuna sweeper context
+            from hydra.core.global_hydra import GlobalHydra
+
+            hydra_cfg = GlobalHydra.instance().hydra
+
+            if hydra_cfg and hasattr(hydra_cfg, "sweeper") and hasattr(hydra_cfg.sweeper, "trial"):
+                trial = hydra_cfg.sweeper.trial
+                trial.report(metric_value, step=0)
+
+                # Check if trial should be pruned
+                if trial.should_prune():
+                    logger.info("Trial pruned by Optuna - stopping early")
+                    if mlflow_tracker:
+                        mlflow.set_tag("pruned", "true")
+                        mlflow.end_run()
+                    raise optuna.TrialPruned()
+        except (AttributeError, ImportError):
+            # Not running under Optuna sweeper, continue normally
+            pass
+        except optuna.TrialPruned:
+            # Re-raise pruning signal
+            raise
 
     # ========================================================================
     # PHASE 9: TEST EVALUATION (Final, untouched until now!)
@@ -389,10 +455,6 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     logger.info("TRAINING PIPELINE COMPLETE!")
     logger.info("=" * 80)
 
-    # Return primary metric for hyperparameter optimization
-    primary_metric = cfg.get("primary_metric", "val_mape")
-    _ = val_metrics.get(primary_metric.replace("val_", ""), float("inf"))  # metric_value
-
     return results
 
 
@@ -401,7 +463,10 @@ def main(cfg: DictConfig) -> float:
     """
     Main training entry point with Hydra configuration.
 
-    The function returns the primary validation metric for hyperparameter optimization.
+    Returns the primary metric from VALIDATION set for Optuna hyperparameter optimization.
+    Always uses validation set (never test set) to prevent overfitting.
+    The specific metric (MAPE, RMSE, MAE, etc.) is configurable via primary_metric.
+    Defaults to MAPE if not specified.
 
     Example usage:
         # Single run with default config
@@ -413,6 +478,9 @@ def main(cfg: DictConfig) -> float:
         # Multi-run experiments
         python -m ml_portfolio.training.train -m model=arima,prophet dataset=walmart
 
+        # Optuna hyperparameter optimization
+        python -m ml_portfolio.training.train --multirun hydra/sweeper=optuna
+
         # With hyperparameter overrides
         python -m ml_portfolio.training.train model=lstm model.hidden_size=128 training.epochs=50
 
@@ -421,24 +489,54 @@ def main(cfg: DictConfig) -> float:
 
     Args:
         cfg: Hydra configuration object
+            primary_metric: Name of metric to optimize (default: "MAPE")
+            minimize: Whether to minimize metric (default: True)
 
     Returns:
-        Primary validation metric value (for Optuna optimization)
+        Validation metric value for Optuna optimization (always from val set)
     """
+    import gc
+
     try:
         results = train_pipeline(cfg)
 
-        # Return primary metric for optimization
-        primary_metric = cfg.get("primary_metric", "val_mape")
-        val_metrics = results.get("val_metrics", {})
-        metric_value = val_metrics.get(primary_metric.replace("val_", ""), float("inf"))
+        # Get primary metric from config (defaults to MAPE)
+        # Note: Always uses VALIDATION set to prevent overfitting to test set
+        primary_metric = cfg.get("primary_metric", "MAPE")
 
-        logger.info(f"Returning {primary_metric}: {metric_value}")
+        # Always use validation metrics for optimization
+        val_metrics = results.get("val_metrics", {})
+
+        # Try different metric name variations (MAPE, MAPEMetric, mape)
+        metric_value = (
+            val_metrics.get(primary_metric)
+            or val_metrics.get(f"{primary_metric}Metric")
+            or val_metrics.get(primary_metric.upper())
+            or val_metrics.get(primary_metric.lower())
+            or float("inf")
+        )
+
+        # Handle minimize vs maximize
+        minimize = cfg.get("minimize", True)
+        if not minimize:
+            metric_value = -metric_value  # Negate for maximization problems
+
+        logger.info(f"Returning val_{primary_metric} for optimization: {metric_value:.4f}")
         return metric_value
 
-    except Exception as e:
-        logger.exception(f"Training pipeline failed with error: {e}")
+    except optuna.TrialPruned if OPTUNA_AVAILABLE else Exception:
+        # Re-raise pruned trials for Optuna to handle
+        logger.info("Trial pruned by Optuna")
         raise
+    except Exception as e:
+        logger.exception(f"Training pipeline failed: {e}")
+        # Return infinity for failed trials (Optuna will skip them)
+        return float("inf")
+    finally:
+        # Cleanup resources for Optuna trials
+        if TORCH_AVAILABLE and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
 
 
 if __name__ == "__main__":
