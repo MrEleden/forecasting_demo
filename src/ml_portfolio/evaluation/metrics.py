@@ -24,7 +24,14 @@ def mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
     Returns:
         MAE value
+
+    Raises:
+        ValueError: If arrays are empty or have mismatched shapes
     """
+    if len(y_true) == 0 or len(y_pred) == 0:
+        raise ValueError("Input arrays cannot be empty")
+    if y_true.shape != y_pred.shape:
+        raise ValueError(f"Shape mismatch: y_true {y_true.shape} vs y_pred {y_pred.shape}")
     return float(np.mean(np.abs(y_true - y_pred)))
 
 
@@ -38,7 +45,14 @@ def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
     Returns:
         RMSE value
+
+    Raises:
+        ValueError: If arrays are empty or have mismatched shapes
     """
+    if len(y_true) == 0 or len(y_pred) == 0:
+        raise ValueError("Input arrays cannot be empty")
+    if y_true.shape != y_pred.shape:
+        raise ValueError(f"Shape mismatch: y_true {y_true.shape} vs y_pred {y_pred.shape}")
     return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
 
 
@@ -53,9 +67,19 @@ def mape(y_true: np.ndarray, y_pred: np.ndarray, epsilon: float = 1e-8) -> float
 
     Returns:
         MAPE value (as percentage)
+
+    Raises:
+        ValueError: If arrays are empty or have mismatched shapes
     """
-    mask = np.abs(y_true) > epsilon
-    return float(np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100)
+    # Validate inputs
+    if len(y_true) == 0 or len(y_pred) == 0:
+        raise ValueError("Input arrays cannot be empty")
+    if y_true.shape != y_pred.shape:
+        raise ValueError(f"Shape mismatch: y_true {y_true.shape} vs y_pred {y_pred.shape}")
+
+    # Use epsilon to avoid division by zero
+    denominator = np.maximum(np.abs(y_true), epsilon)
+    return float(np.mean(np.abs((y_true - y_pred) / denominator)) * 100)
 
 
 def smape(y_true: np.ndarray, y_pred: np.ndarray, epsilon: float = 1e-8) -> float:
