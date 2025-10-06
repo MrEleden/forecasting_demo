@@ -118,9 +118,9 @@ USER mluser
 
 # Optimized Gunicorn + Uvicorn for production
 CMD ["gunicorn", "ml_portfolio.api.main:app", \
-     "--workers", "4", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", \
-     "--timeout", "300", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-"]
+    "--workers", "4", \
+    "--worker-class", "uvicorn.workers.UvicornWorker", \
+    "--bind", "0.0.0.0:8000", \
+    "--timeout", "300", \
+    "--access-logfile", "-", \
+    "--error-logfile", "-"]

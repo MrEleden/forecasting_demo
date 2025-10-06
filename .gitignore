@@ -216,6 +216,7 @@ mlruns/
 .neptune/
 .wandb/
 checkpoints/
+catboost_info/
 
 # Jupyter notebooks output
 *-checkpoint.ipynb
