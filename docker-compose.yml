@@ -1,0 +1,121 @@
+# Docker Compose for ML Forecasting Portfolio
+# Orchestrates multiple services for development and production
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # API Service (FastAPI)
+  # ==========================================================================
+  api:
+    build:
+      context: .
+      target: serving
+    container_name: forecasting_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./mlruns:/app/mlruns
+    environment:
+      - MLFLOW_TRACKING_URI=/app/mlruns
+      - MODEL_DIR=/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - forecasting_network
+
+  # ==========================================================================
+  # Training Service
+  # ==========================================================================
+  training:
+    build:
+      context: .
+      target: training
+    container_name: forecasting_training
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./mlruns:/app/mlruns
+      - ./results:/app/results
+    environment:
+      - MLFLOW_TRACKING_URI=/app/mlruns
+    command: >
+      python src/ml_portfolio/training/train.py
+      dataset=walmart
+      model=lightgbm
+    networks:
+      - forecasting_network
+
+  # ==========================================================================
+  # Dashboard (Streamlit)
+  # ==========================================================================
+  dashboard:
+    build:
+      context: .
+      target: application
+    container_name: forecasting_dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./results:/app/results
+      - ./mlruns:/app/mlruns
+    command: streamlit run src/ml_portfolio/dashboard/app.py --server.port=8501 --server.address=0.0.0.0
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - forecasting_network
+
+  # ==========================================================================
+  # MLflow Server (Optional - for experiment tracking UI)
+  # ==========================================================================
+  mlflow:
+    build:
+      context: .
+      target: application
+    container_name: forecasting_mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/app/mlruns
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri file:///app/mlruns
+    restart: unless-stopped
+    networks:
+      - forecasting_network
+
+  # ==========================================================================
+  # Development Environment (Optional)
+  # ==========================================================================
+  dev:
+    build:
+      context: .
+      target: development
+    container_name: forecasting_dev
+    ports:
+      - "8888:8888"  # Jupyter
+      - "8000:8000"  # API
+    volumes:
+      - .:/app
+      - /app/.venv  # Exclude venv from mounting
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    command: >
+      bash -c "pip install jupyter &&
+               jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root"
+    networks:
+      - forecasting_network
+
+networks:
+  forecasting_network:
+    driver: bridge
+
+volumes:
+  mlruns_data:
+  models_data:
