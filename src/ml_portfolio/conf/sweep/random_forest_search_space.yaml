@@ -1,0 +1,63 @@
+# ==============================================================================
+# Random Forest Hyperparameter Search Space
+# ==============================================================================
+#
+# Defines Optuna search space for Random Forest hyperparameters.
+# Auto-loaded when: model=random_forest and use_optuna=true
+#
+# ==============================================================================
+
+# Hydra sweeper parameters (merged into hydra.sweeper.params)
+hydra:
+  sweeper:
+    # Study configuration
+    study_name: walmart_random_forest_optimization
+    n_trials: 50
+
+    # Search space definition
+    params:
+      # Number of trees
+      +model.n_estimators:
+        type: int
+        low: 50
+        high: 500
+        step: 50
+
+      # Tree depth
+      +model.max_depth:
+        type: int
+        low: 5
+        high: 30
+
+      # Minimum samples to split a node
+      +model.min_samples_split:
+        type: int
+        low: 2
+        high: 20
+
+      # Minimum samples in leaf node
+      +model.min_samples_leaf:
+        type: int
+        low: 1
+        high: 10
+
+      # Feature sampling
+      +model.max_features:
+        type: categorical
+        choices: [sqrt, log2, 0.5, 0.7, 1.0]
+
+      # Bootstrap sampling
+      +model.bootstrap:
+        type: categorical
+        choices: [true, false]
+
+      # Minimum impurity decrease
+      +model.min_impurity_decrease:
+        type: float
+        low: 0.0
+        high: 0.1
+
+      # Out-of-bag scoring (only if bootstrap=true)
+      +model.oob_score:
+        type: categorical
+        choices: [true, false]

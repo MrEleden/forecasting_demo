@@ -1,0 +1,75 @@
+# ==============================================================================
+# Prophet Hyperparameter Search Space
+# ==============================================================================
+#
+# Defines Optuna search space for Prophet hyperparameters.
+# Auto-loaded when: model=prophet and use_optuna=true
+#
+# Note: Prophet has fewer hyperparameters than tree-based models,
+# but tuning seasonality and changepoint parameters can significantly
+# improve performance.
+#
+# ==============================================================================
+
+# Hydra sweeper parameters (merged into hydra.sweeper.params)
+hydra:
+  sweeper:
+    # Study configuration
+    study_name: walmart_prophet_optimization
+    n_trials: 40  # Fewer trials needed due to fewer parameters
+
+    # Search space definition
+    params:
+      # Changepoint prior scale (flexibility of trend)
+      +model.changepoint_prior_scale:
+        type: float
+        low: 0.001
+        high: 0.5
+        log: true
+
+      # Seasonality prior scale (flexibility of seasonality)
+      +model.seasonality_prior_scale:
+        type: float
+        low: 0.01
+        high: 10.0
+        log: true
+
+      # Holidays prior scale (flexibility of holidays)
+      +model.holidays_prior_scale:
+        type: float
+        low: 0.01
+        high: 10.0
+        log: true
+
+      # Seasonality mode
+      +model.seasonality_mode:
+        type: categorical
+        choices: [additive, multiplicative]
+
+      # Number of changepoints
+      +model.n_changepoints:
+        type: int
+        low: 10
+        high: 50
+        step: 5
+
+      # Changepoint range (proportion of history to use for changepoints)
+      +model.changepoint_range:
+        type: float
+        low: 0.8
+        high: 0.95
+
+      # Weekly seasonality
+      +model.weekly_seasonality:
+        type: categorical
+        choices: [auto, true, false]
+
+      # Yearly seasonality
+      +model.yearly_seasonality:
+        type: categorical
+        choices: [auto, true, false]
+
+      # Daily seasonality (usually false for weekly/monthly data)
+      +model.daily_seasonality:
+        type: categorical
+        choices: [auto, false]

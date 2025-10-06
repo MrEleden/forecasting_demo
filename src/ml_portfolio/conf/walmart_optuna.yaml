@@ -1,0 +1,91 @@
+# ==============================================================================
+# Walmart Optuna Optimization Configuration
+# ==============================================================================
+#
+# Runs Optuna hyperparameter optimization on Walmart dataset.
+# Automatically loads model-specific search spaces from sweep/ directory.
+#
+# IMPORTANT: The --multirun flag is REQUIRED to activate Optuna optimization!
+#            Without --multirun, this runs as a single training (no optimization).
+#
+# Usage:
+#   # RECOMMENDED: Use model-specific configs (auto-loads correct search space)
+#   python src/ml_portfolio/training/train.py --config-name walmart_optuna_lightgbm --multirun
+#   python src/ml_portfolio/training/train.py --config-name walmart_optuna_xgboost --multirun
+#   python src/ml_portfolio/training/train.py --config-name walmart_optuna_catboost --multirun
+#   python src/ml_portfolio/training/train.py --config-name walmart_optuna_random_forest --multirun
+#
+#   # Custom number of trials
+#   python src/ml_portfolio/training/train.py --config-name walmart_optuna_lightgbm --multirun hydra.sweeper.n_trials=20
+#
+#   # ALTERNATIVE: Base config with manual search space (requires defining params)
+#   python src/ml_portfolio/training/train.py --config-name walmart_optuna --multirun model=lightgbm 'model.learning_rate=interval(0.01,0.3)' ...
+#
+# WRONG USAGE (will NOT optimize, just runs single training):
+#   python src/ml_portfolio/training/train.py --config-name walmart_optuna model=lightgbm  # Missing --multirun flag!
+#
+# ==============================================================================
+
+defaults:
+  - walmart  # Inherit all Walmart settings
+  - override hydra/sweeper: optuna  # Enable Optuna sweeper
+  - _self_
+
+# ==============================================================================
+# OPTIMIZATION SETTINGS
+# ==============================================================================
+
+# Enable Optuna optimization
+use_optuna: true
+
+# Experiment name for optimization runs
+experiment_name: walmart_optuna_optimization
+
+# ==============================================================================
+# HOW IT WORKS
+# ==============================================================================
+#
+# 1. --multirun flag activates Hydra's Optuna sweeper
+# 2. Sweeper reads hydra.sweeper.n_trials (default: 50)
+# 3. For each trial, Optuna suggests hyperparameters from sweep/{model}_search_space.yaml
+# 4. Training runs with suggested hyperparameters
+# 5. Validation metric (MAPE by default) is returned to Optuna
+# 6. Optuna uses TPE sampler to suggest better parameters for next trial
+# 7. Best parameters are saved and logged to MLflow
+#
+# Without --multirun: Runs once with default hyperparameters (no optimization)
+# With --multirun: Runs n_trials times with Optuna-suggested hyperparameters
+#
+# ==============================================================================
+
+# ==============================================================================
+# HYDRA SWEEPER CONFIGURATION
+# ==============================================================================
+
+hydra:
+  sweeper:
+    # Study configuration
+    study_name: walmart_optimization  # Will be unique per model run
+    storage: null  # Set to sqlite:///optuna.db for persistence
+
+    # Optimization direction
+    direction: minimize
+
+    # Number of trials (can be overridden per run)
+    n_trials: 50
+
+    # Parallel jobs (1 = sequential, -1 = all cores)
+    n_jobs: 1
+
+    # Search space parameters
+    # NOTE: This base config has NO search space defined
+    # Use model-specific configs (walmart_optuna_<model>.yaml) which auto-load
+    # the correct search space from sweep/<model>_search_space.yaml
+    params: {}
+
+  # Output directories
+  run:
+    dir: outputs/walmart/optuna/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: outputs/walmart/optuna/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: trial_${hydra.job.num}

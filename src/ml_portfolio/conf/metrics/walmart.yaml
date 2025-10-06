@@ -1,17 +1,17 @@
 # ==============================================================================
-# Default Metrics Configuration
+# Walmart-Specific Metrics Configuration
 # ==============================================================================
 #
-# Standard metrics for time series forecasting. These are the most common
-# error metrics used across all datasets.
+# Standard metrics for Walmart sales forecasting evaluation.
+# Uses MAPE as primary metric for optimization stability.
 #
 # ==============================================================================
 
 # Primary metric for model selection and early stopping
-primary_metric: MAPE  # Options: MAPE, RMSE, MAE (use uppercase for consistency)
+primary_metric: MAPE  # Use MAPE for optimization (stable and interpretable)
 
 # Whether to minimize the primary metric
-minimize: true  # true for error metrics, false for accuracy metrics
+minimize: true
 
 # List of metrics to compute during training and evaluation
 metrics:
@@ -25,5 +25,5 @@ metrics:
   - _target_: ml_portfolio.evaluation.metrics.MAEMetric
     name: MAE
 
-# Note: Each metric class has a __call__ method that takes (y_true, y_pred)
-# The engine will instantiate these classes and call them as: metric_instance(y_true, y_pred)
+# Note: MAPE is used as primary metric for hyperparameter optimization
+# as it's stable, interpretable, and generalizes well across different scales.

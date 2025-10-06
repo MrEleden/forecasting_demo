@@ -1,0 +1,53 @@
+# ==============================================================================
+# Walmart LightGBM Optuna Optimization
+# ==============================================================================
+#
+# Complete configuration for LightGBM hyperparameter optimization.
+#
+# Usage:
+#   python src/ml_portfolio/training/train.py --config-path sweep --config-name lightgbm_search_space --multirun
+#   python src/ml_portfolio/training/train.py --config-path sweep --config-name lightgbm_search_space --multirun hydra.sweeper.n_trials=20
+#
+# ==============================================================================
+
+defaults:
+  - override /hydra/sweeper: optuna  # Enable Optuna sweeper
+  - override /model: lightgbm  # Use LightGBM model
+  - _self_
+
+# Enable Optuna optimization
+use_optuna: true
+
+# Override experiment name
+experiment_name: walmart_optuna_lightgbm
+
+# Hydra sweeper configuration
+hydra:
+  sweeper:
+    study_name: walmart_lightgbm_${now:%Y%m%d_%H%M%S}
+    direction: minimize
+    n_trials: 50
+    n_jobs: 1
+
+    # Search space definition
+    # Hydra-Optuna syntax: https://hydra.cc/docs/plugins/optuna_sweeper/
+    #   range(start, stop, step) - Integer uniform distribution
+    #   interval(start, stop) - Float uniform distribution
+    #   choice(a, b, c, ...) - Categorical distribution
+    params:
+      # Boosting parameters
+      model.n_estimators: range(100, 1000, 50)
+      model.learning_rate: interval(0.001, 0.3)
+
+      # Tree structure
+      model.max_depth: range(3, 12)
+      model.num_leaves: range(20, 150)
+      model.min_child_samples: range(5, 100)
+
+      # Regularization
+      model.reg_alpha: interval(0.0, 10.0)
+      model.reg_lambda: interval(0.0, 10.0)
+
+      # Sampling
+      model.subsample: interval(0.5, 1.0)
+      model.colsample_bytree: interval(0.5, 1.0)

@@ -218,7 +218,32 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     if MLFLOW_AVAILABLE and cfg.get("use_mlflow", False):
         mlflow.set_experiment(cfg.get("experiment_name", "forecasting"))
         mlflow.start_run(run_name=cfg.get("run_name", None))
-        mlflow.log_params(OmegaConf.to_container(cfg, resolve=True))
+
+        # Flatten and log parameters (MLflow needs flat key-value pairs)
+        def flatten_dict(d, parent_key="", sep="."):
+            """Flatten nested dict into flat key-value pairs."""
+            items = []
+            for k, v in d.items():
+                new_key = f"{parent_key}{sep}{k}" if parent_key else k
+                if isinstance(v, dict):
+                    items.extend(flatten_dict(v, new_key, sep=sep).items())
+                else:
+                    # MLflow has 500 char limit for param values
+                    items.append((new_key, str(v)[:500] if v is not None else "None"))
+            return dict(items)
+
+        cfg_dict = OmegaConf.to_container(cfg, resolve=True)
+        flat_params = flatten_dict(cfg_dict)
+
+        # Log in batches (MLflow has limits on number of params per call)
+        param_items = list(flat_params.items())
+        batch_size = 100
+        for i in range(0, len(param_items), batch_size):
+            batch = dict(param_items[i : i + batch_size])
+            try:
+                mlflow.log_params(batch)
+            except Exception as e:
+                logger.warning(f"Failed to log parameter batch: {e}")
 
         # Log additional metadata as tags for MLflow UI
         # Extract model name from config
@@ -241,20 +266,34 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
         # Detect if running under Optuna and get trial info
         trial_number = None
         if OPTUNA_AVAILABLE and cfg.get("use_optuna", False):
+            # Method 1: Extract from current working directory (Hydra creates trial_N subdirs)
             try:
-                from hydra.core.global_hydra import GlobalHydra
+                import os
+                import re
 
-                hydra_cfg = GlobalHydra.instance().hydra
-                if hydra_cfg and hasattr(hydra_cfg, "sweeper") and hasattr(hydra_cfg.sweeper, "trial"):
-                    trial = hydra_cfg.sweeper.trial
-                    trial_number = trial.number
-            except (AttributeError, ImportError):
-                pass
+                cwd = os.getcwd()
+                # Pattern: .../trial_0, .../trial_1, etc.
+                match = re.search(r"trial_(\d+)", cwd)
+                if match:
+                    trial_number = int(match.group(1))
+                    logger.info(f"Detected Optuna trial from directory: {trial_number}")
+            except Exception as e:
+                logger.debug(f"Could not extract trial number from directory: {e}")
+
+            # Method 2: Try to get from Hydra job config
+            if trial_number is None:
+                try:
+                    if hasattr(cfg, "hydra") and hasattr(cfg.hydra, "job"):
+                        trial_number = cfg.hydra.job.num
+                        logger.info(f"Detected Optuna trial from Hydra job number: {trial_number}")
+                except (AttributeError, KeyError):
+                    pass
 
         # Build run name with trial number if available
         run_name_base = f"{model_name}_{dataset_name or 'run'}"
         if trial_number is not None:
             run_name_base += f"_trial_{trial_number}"
+            logger.info(f"MLflow run will be tagged with trial number: {trial_number}")
 
         # Log as MLflow tags (visible in UI)
         mlflow.set_tag("mlflow.runName", run_name_base)
@@ -507,14 +546,22 @@ def main(cfg: DictConfig) -> float:
         # Always use validation metrics for optimization
         val_metrics = results.get("val_metrics", {})
 
-        # Try different metric name variations (MAPE, MAPEMetric, mape)
+        # Try different metric name variations
+        # Note: val_metrics already has 'val_' prefix in keys (e.g., 'val_MAPEMetric')
         metric_value = (
-            val_metrics.get(primary_metric)
+            val_metrics.get(f"val_{primary_metric}")
+            or val_metrics.get(f"val_{primary_metric}Metric")
+            or val_metrics.get(primary_metric)
             or val_metrics.get(f"{primary_metric}Metric")
             or val_metrics.get(primary_metric.upper())
             or val_metrics.get(primary_metric.lower())
-            or float("inf")
         )
+
+        if metric_value is None:
+            logger.warning(
+                f"Could not find metric '{primary_metric}' in val_metrics. Available keys: {list(val_metrics.keys())}"
+            )
+            metric_value = float("inf")
 
         # Handle minimize vs maximize
         minimize = cfg.get("minimize", True)

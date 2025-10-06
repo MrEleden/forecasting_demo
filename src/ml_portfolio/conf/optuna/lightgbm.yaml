@@ -1,0 +1,34 @@
+# @package hydra.sweeper
+# ==============================================================================
+# LightGBM Optuna Search Space
+# ==============================================================================
+#
+# Usage:
+#   python src/ml_portfolio/training/train.py --config-name walmart model=lightgbm \
+#     use_optuna=true hydra/sweeper=optuna optuna=lightgbm --multirun
+#
+# ==============================================================================
+
+study_name: walmart_lightgbm_${now:%Y%m%d_%H%M%S}
+direction: minimize
+n_trials: 50
+n_jobs: 1
+
+# Search space definition
+params:
+  # Boosting parameters
+  model.n_estimators: range(100, 1000, 50)
+  model.learning_rate: interval(0.001, 0.3)
+
+  # Tree structure
+  model.max_depth: range(3, 12)
+  model.num_leaves: range(20, 150)
+  model.min_child_samples: range(5, 100)
+
+  # Regularization
+  model.reg_alpha: interval(0.0, 10.0)
+  model.reg_lambda: interval(0.0, 10.0)
+
+  # Sampling
+  model.subsample: interval(0.5, 1.0)
+  model.colsample_bytree: interval(0.5, 1.0)

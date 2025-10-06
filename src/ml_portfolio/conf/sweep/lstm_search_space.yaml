@@ -1,0 +1,90 @@
+# ==============================================================================
+# LSTM Hyperparameter Search Space
+# ==============================================================================
+#
+# Defines Optuna search space for LSTM hyperparameters.
+# Auto-loaded when: model=lstm and use_optuna=true
+#
+# Note: Deep learning models require more careful tuning and
+# computational resources than statistical models.
+#
+# ==============================================================================
+
+# Hydra sweeper parameters (merged into hydra.sweeper.params)
+hydra:
+  sweeper:
+    # Study configuration
+    study_name: walmart_lstm_optimization
+    n_trials: 60  # Deep learning requires more trials
+
+    # Search space definition
+    params:
+      # Network architecture
+      +model.hidden_size:
+        type: int
+        low: 32
+        high: 256
+        step: 32
+
+      +model.num_layers:
+        type: int
+        low: 1
+        high: 4
+
+      +model.dropout:
+        type: float
+        low: 0.0
+        high: 0.5
+
+      # Training parameters
+      +model.learning_rate:
+        type: float
+        low: 0.0001
+        high: 0.01
+        log: true
+
+      +model.batch_size:
+        type: categorical
+        choices: [16, 32, 64, 128]
+
+      +model.epochs:
+        type: int
+        low: 50
+        high: 200
+        step: 50
+
+      # Sequence parameters
+      +model.seq_len:
+        type: int
+        low: 10
+        high: 100
+        step: 10
+
+      # Regularization
+      +model.weight_decay:
+        type: float
+        low: 0.0
+        high: 0.001
+        log: true
+
+      # Optimizer
+      +model.optimizer:
+        type: categorical
+        choices: [adam, adamw, sgd]
+
+      # Gradient clipping
+      +model.clip_grad:
+        type: float
+        low: 0.5
+        high: 5.0
+
+      # Early stopping patience
+      +model.patience:
+        type: int
+        low: 5
+        high: 20
+
+      # Bidirectional LSTM
+      +model.bidirectional:
+        type: categorical
+        choices: [true, false]

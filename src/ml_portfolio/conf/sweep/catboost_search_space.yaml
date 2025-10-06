@@ -1,0 +1,74 @@
+# ==============================================================================
+# CatBoost Hyperparameter Search Space
+# ==============================================================================
+#
+# Defines Optuna search space for CatBoost hyperparameters.
+# Auto-loaded when: model=catboost and use_optuna=true
+#
+# ==============================================================================
+
+# Hydra sweeper parameters (merged into hydra.sweeper.params)
+hydra:
+  sweeper:
+    # Study configuration
+    study_name: walmart_catboost_optimization
+    n_trials: 50
+
+    # Search space definition
+    params:
+      # Boosting parameters
+      +model.iterations:
+        type: int
+        low: 100
+        high: 1000
+        step: 50
+
+      +model.learning_rate:
+        type: float
+        low: 0.001
+        high: 0.3
+        log: true
+
+      # Tree structure
+      +model.depth:
+        type: int
+        low: 4
+        high: 10
+
+      +model.min_data_in_leaf:
+        type: int
+        low: 1
+        high: 100
+
+      # Regularization
+      +model.l2_leaf_reg:
+        type: float
+        low: 1.0
+        high: 10.0
+
+      +model.random_strength:
+        type: float
+        low: 0.0
+        high: 10.0
+
+      +model.bagging_temperature:
+        type: float
+        low: 0.0
+        high: 1.0
+
+      # Sampling
+      +model.subsample:
+        type: float
+        low: 0.5
+        high: 1.0
+
+      +model.rsm:
+        type: float
+        low: 0.5
+        high: 1.0
+
+      # Categorical features
+      +model.border_count:
+        type: int
+        low: 32
+        high: 255

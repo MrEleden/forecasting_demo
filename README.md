@@ -10,12 +10,17 @@ Professional ML portfolio showcasing time series forecasting across multiple dom
 
 > **📚 Installation**: See [Setup Guide](docs/SETUP.md) for detailed environment setup and installation instructions.
 
-```bash
-# Run a model
-python src/ml_portfolio/training/train.py model=arima dataset_factory=walmart
+> **🎯 Walmart Config**: See [Walmart Configuration Guide](docs/WALMART_CONFIG_GUIDE.md) for detailed usage examples with auto-loading search spaces.
 
-# Multi-model comparison
-python src/ml_portfolio/training/train.py -m model=arima,lstm,random_forest dataset_factory=walmart
+```bash
+# Simple training
+python src/ml_portfolio/training/train.py --config-name walmart
+
+# Model comparison
+python src/ml_portfolio/training/train.py --config-name walmart -m model=lightgbm,xgboost
+
+# Hyperparameter optimization (auto-loads model-specific search space)
+python src/ml_portfolio/training/train.py --config-name walmart model=lightgbm use_optuna=true --multirun
 ```
 
 ## 🏗️ Architecture
@@ -78,23 +83,34 @@ python src/ml_portfolio/training/train.py experiment=model_comparison model=arim
 
 ## 🔄 Hyperparameter Optimization
 
-**Comprehensive sweep capabilities** with Optuna integration:
+**Comprehensive Optuna integration** with advanced features:
 
 - **📈 Statistical Models**: ARIMA order selection, Prophet seasonality tuning
-- **🌳 ML Models**: Random Forest, XGBoost with regularization optimization
+- **🌳 ML Models**: LightGBM, XGBoost, CatBoost with regularization optimization
 - **🧠 Deep Learning**: LSTM, TCN, Transformer architecture search
-- **🎯 Multi-Objective**: Accuracy vs efficiency trade-offs
-- **⚡ Advanced Features**: Pruning, persistent studies, distributed execution
+- **🎯 Multi-Objective**: Accuracy vs efficiency trade-offs (MAPE + training time)
+- **⚡ Advanced Features**: Pruning, persistent studies, distributed execution, visualization
 
 ```bash
-# Quick start with pre-configured experiments
-python src/ml_portfolio/training/train.py experiment=lstm_sweep          # 60 trials
-python src/ml_portfolio/training/train.py experiment=random_forest_sweep # 50 trials
-python src/ml_portfolio/training/train.py experiment=walmart_optimization # Dataset-specific
+# Quick test (10 trials)
+python src/ml_portfolio/training/train.py --config-path ../conf --config-name config_optuna_test model=xgboost
+
+# Comprehensive showcase (validates all features)
+scripts\demo_optuna_showcase.bat  # Windows
+bash scripts/demo_optuna_showcase.sh  # Linux/Mac
+
+# Distributed optimization (multiple workers)
+python src/ml_portfolio/training/train.py --config-path ../conf --config-name config_distributed
+
+# Multi-objective optimization (MAPE + speed)
+python src/ml_portfolio/training/train.py --config-path ../conf --config-name config_multiobjective
+
+# Generate visualization
+python src/ml_portfolio/scripts/visualize_optuna.py --study-name <name> --storage sqlite:///optuna.db
 
 # See full documentation
-# docs/HYPERPARAMETER_SWEEPS.md - Comprehensive guide
-# docs/SWEEP_COMMANDS.md - Ready-to-use commands
+# docs/OPTUNA_SHOWCASE.md - Complete implementation guide
+# docs/OPTUNA_GUIDE.md - Usage reference
 ```
 
 ## � Configuration Management

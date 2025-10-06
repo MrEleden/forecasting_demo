@@ -1,87 +1,81 @@
+# ==============================================================================
 # Main Configuration for ML Portfolio Training Pipeline
+# ==============================================================================
 #
-# This config follows Burkov's ML Engineering principles:
+# This config follows ML Engineering best practices:
 # - Data leakage prevention (fit on train, transform all)
 # - Test set isolation (never touched until final evaluation)
 # - Config-driven design (Hydra)
 # - Reproducibility (seeds, logging)
 #
-# MODEL-DRIVEN CONFIGURATION:
-# Each model config automatically includes its required components:
-#   - dataloader: SimpleDataLoader (sklearn/statistical) or PyTorchDataLoader (deep learning)
-#   - engine: StatisticalEngine or PyTorchEngine
-#
 # Usage:
-#   python -m ml_portfolio.training.train model=arima dataset_factory=default
-#   python -m ml_portfolio.training.train model=lstm dataset_factory=default
-#   python -m ml_portfolio.training.train -m model=arima,random_forest,lstm
+#   python src/ml_portfolio/training/train.py
+#   python src/ml_portfolio/training/train.py model=xgboost
+#   python src/ml_portfolio/training/train.py -m model=lightgbm,xgboost
+#
+# ==============================================================================
 
 defaults:
-  - dataset_factory: default    # Dataset factory for creating train/val/test splits
-  - feature_engineering: none   # Feature engineering (static + statistical)
-  - model: random_forest        # Model (automatically includes dataloader + engine)
-  - metrics: default            # Metrics configuration
+  - dataset_factory: default
+  - feature_engineering: none
+  - model: random_forest
+  - metrics: default
   - _self_
 
-# You can still override model's defaults:
-#   python train.py model=lstm dataloader=pytorch engine=pytorch
+# ==============================================================================
+# EXPERIMENT SETTINGS
+# ==============================================================================
 
-# ============================================================================
-# GLOBAL SETTINGS
-# ============================================================================
+# Experiment identification
+experiment_name: ml_portfolio_forecasting
+dataset_name: default
+run_name: null  # Auto-generated if null (format: {model}_{timestamp})
 
 # Random seed for reproducibility
 seed: 42
 
-# Logging configuration
-log_level: INFO  # DEBUG, INFO, WARNING, ERROR
+# ==============================================================================
+# LOGGING CONFIGURATION
+# ==============================================================================
+
+log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 verbose: true
 
-# MLflow tracking (optional)
+# ==============================================================================
+# TRACKING AND OPTIMIZATION
+# ==============================================================================
+
+# MLflow experiment tracking
 use_mlflow: false
-experiment_name: ml_portfolio_forecasting
-run_name: null  # Auto-generated if null
+
+# Optuna hyperparameter optimization
+use_optuna: false
+primary_metric: MAPE  # Metric to optimize (always on validation set)
+minimize: true  # Whether to minimize the metric (true for MAPE/RMSE/MAE)
+
+# ==============================================================================
+# MODEL PERSISTENCE
+# ==============================================================================
 
 # Checkpointing
 save_checkpoints: true
 checkpoint_dir: null  # Auto-generated in outputs/ if null
 
-# Primary metric for optimization (used by Optuna)
-primary_metric: mape  # Will be prefixed with "val_" (e.g., val_mape)
+# ==============================================================================
+# TRAINING SETTINGS
+# ==============================================================================
 
-# ============================================================================
-# FEATURE ENGINEERING CONFIGURATION
-# ============================================================================
-#
-# Each feature_engineering config contains TWO pipelines:
-#
-# 1. static: StaticTimeSeriesPreprocessingPipeline
-#    - Applied BEFORE splitting (in DatasetFactory)
-#    - Deterministic, backward-looking features (safe, no leakage)
-#    - Examples: date features, lags, rolling windows
-#    - Config: feature_engineering.static
-#
-# 2. statistical: StatisticalPreprocessingPipeline
-#    - Applied AFTER splitting (in train.py Phase 4)
-#    - Fit on train, transform all (Burkov's principle)
-#    - Examples: StandardScaler, RobustScaler, MinMaxScaler
-#    - Config: feature_engineering.statistical
-#
-# Available configs:
-#   - full: Both static + statistical (StandardScaler)
-#   - static_only: Only static feature engineering
-#   - statistical_only: Only statistical preprocessing
-#   - minimal: Minimal static + StandardScaler
-#   - robust: Static + RobustScaler (good for outliers)
-#   - minmax: Static + MinMaxScaler (good for neural networks)
-#   - none: No preprocessing (good for tree-based models)
-#
-# Override: python train.py feature_engineering=full
-# Custom: python train.py feature_engineering=full feature_engineering.static.lag_features=[1,7]
+# Early stopping (for iterative models)
+early_stopping_patience: null  # Set per model if needed
+early_stopping_min_delta: 0.001
 
-# ============================================================================
+# Validation frequency
+validate_every_n_epochs: 1
+
+# ==============================================================================
 # HYDRA CONFIGURATION
-# ============================================================================
+# ==============================================================================
+
 hydra:
   run:
     dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}

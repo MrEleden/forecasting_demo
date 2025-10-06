@@ -1,0 +1,32 @@
+# @package hydra.sweeper
+# ==============================================================================
+# CatBoost Optuna Search Space
+# ==============================================================================
+#
+# Usage:
+#   python src/ml_portfolio/training/train.py --multirun --config-name walmart \
+#     model=catboost use_optuna=true hydra/sweeper=optuna +optuna=catboost
+#
+# ==============================================================================
+
+study_name: walmart_catboost_${now:%Y%m%d_%H%M%S}
+direction: minimize
+n_trials: 50
+n_jobs: 1
+
+# Search space definition
+params:
+  # Boosting parameters
+  model.iterations: range(100, 1000, 50)
+  model.learning_rate: interval(0.001, 0.3)
+
+  # Tree structure
+  model.depth: range(4, 10)
+
+  # Regularization
+  model.l2_leaf_reg: interval(1.0, 10.0)
+  model.random_strength: interval(0.0, 10.0)
+  model.bagging_temperature: interval(0.0, 1.0)
+
+  # Sampling
+  model.subsample: interval(0.5, 1.0)

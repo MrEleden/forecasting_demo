@@ -1,0 +1,33 @@
+# @package hydra.sweeper
+# ==============================================================================
+# Random Forest Optuna Search Space
+# ==============================================================================
+#
+# Usage:
+#   python src/ml_portfolio/training/train.py --config-name walmart model=random_forest \
+#     use_optuna=true hydra/sweeper=optuna optuna=random_forest --multirun
+#
+# ==============================================================================
+
+study_name: walmart_random_forest_${now:%Y%m%d_%H%M%S}
+direction: minimize
+n_trials: 50
+n_jobs: 1
+
+# Search space definition
+params:
+  # Number of trees
+  model.n_estimators: range(50, 500, 50)
+
+  # Tree depth
+  model.max_depth: range(5, 30)
+
+  # Split parameters
+  model.min_samples_split: range(2, 20)
+  model.min_samples_leaf: range(1, 10)
+
+  # Feature sampling
+  model.max_features: choice("sqrt", "log2", 0.5, 0.7, 1.0)
+
+  # Bootstrap
+  model.bootstrap: choice(true, false)

@@ -1,63 +1,92 @@
-# Walmart-Specific Configuration
-# Optimized settings for Walmart sales forecasting
+# ==============================================================================
+# Walmart Sales Forecasting Configuration
+# ==============================================================================
 #
-# This config sets all the right defaults for Walmart dataset training
-# Usage: python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart
+# Dataset: M5 Competition Walmart sales data
+# Task: Forecast weekly sales for multiple stores/departments
+# Primary Metric: WMAE (competition metric) or MAPE for optimization
+#
+# Usage:
+#   # Normal training
+#   python src/ml_portfolio/training/train.py --config-name walmart
+#   python src/ml_portfolio/training/train.py --config-name walmart model=xgboost
+#
+#   # Model comparison (grid search)
+#   python src/ml_portfolio/training/train.py --config-name walmart -m model=lightgbm,xgboost
+#
+#   # Hyperparameter optimization (auto-loads sweep/{model}_search_space.yaml)
+#   python src/ml_portfolio/training/train.py --config-name walmart use_optuna=true --multirun
+#   python src/ml_portfolio/training/train.py --config-name walmart model=xgboost use_optuna=true --multirun
+#
+#   # Multi-model optimization (auto-loads each model's search space)
+#   python src/ml_portfolio/training/train.py --config-name walmart use_optuna=true -m model=lightgbm,xgboost,catboost
+#
+# ==============================================================================
 
 defaults:
-  - dataset_factory: walmart          # Walmart dataset with Weekly_Sales target
-  - feature_engineering: walmart_full  # Static features optimized for Walmart
-  - model: random_forest               # Start with Random Forest (good baseline)
-  - metrics: default                   # Standard metrics (MAPE, RMSE, MAE)
+  - config  # Inherit base configuration
+  - override dataset_factory: walmart
+  - override feature_engineering: walmart_full
+  - override model: lightgbm  # Best performer from benchmarks
   - _self_
 
-# ============================================================================
-# GLOBAL SETTINGS
-# ============================================================================
+# ==============================================================================
+# EXPERIMENT SETTINGS
+# ==============================================================================
+
+# Experiment identification
+experiment_name: walmart_sales_forecasting
+dataset_name: walmart
+run_name: null  # Auto-generated (format: {model}_{timestamp})
+
+# Random seed for reproducibility
 seed: 42
+
+# ==============================================================================
+# LOGGING CONFIGURATION
+# ==============================================================================
+
 log_level: INFO
 verbose: true
 
-# ============================================================================
-# MLFLOW TRACKING (Optional)
-# ============================================================================
-use_mlflow: false
-experiment_name: walmart_sales_forecasting
-run_name: null  # Auto-generated if null
+# ==============================================================================
+# TRACKING AND OPTIMIZATION
+# ==============================================================================
 
-# ============================================================================
-# CHECKPOINTING
-# ============================================================================
+# MLflow experiment tracking (enabled for Walmart project)
+use_mlflow: true
+
+# Optuna hyperparameter optimization (disabled by default)
+use_optuna: false
+primary_metric: MAPE  # Optimize validation MAPE
+minimize: true
+
+# ==============================================================================
+# MODEL PERSISTENCE
+# ==============================================================================
+
+# Checkpointing
 save_checkpoints: true
-checkpoint_dir: null  # Auto-generated in outputs/ if null
+checkpoint_dir: null  # Auto-generated in outputs/walmart/
 
-# ============================================================================
-# METRICS
-# ============================================================================
-primary_metric: mape  # Primary metric for optimization (lower is better)
+# ==============================================================================
+# TRAINING SETTINGS
+# ==============================================================================
 
-# ============================================================================
-# NOTES
-# ============================================================================
-# Walmart Dataset:
-# - Target: Weekly_Sales (store sales per week)
-# - Features: Store, Date, Holiday_Flag, Temperature, Fuel_Price, CPI, Unemployment
-# - Temporal ordering: Weekly data from 2010-2012
-# - Recommended models: Random Forest, XGBoost, LSTM
-#
-# Feature Engineering:
-# - walmart_static: Lag features + rolling windows + date features (no scaling)
-# - walmart_full: Same as walmart_static but with StandardScaler (for neural nets)
-#
-# Quick Commands:
-#   # Random Forest (recommended starting point)
-#   python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart
-#
-#   # With full feature engineering (scaled features)
-#   python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart feature_engineering=walmart_full
-#
-#   # Different model
-#   python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart model=lstm
-#
-#   # Multi-run comparison
-#   python src/ml_portfolio/training/train.py --config-path ../conf --config-name walmart -m model=random_forest,arima
+# Early stopping (for iterative models like LightGBM, XGBoost)
+early_stopping_patience: 10
+early_stopping_min_delta: 0.001
+
+# Validation frequency
+validate_every_n_epochs: 1
+
+# ==============================================================================
+# HYDRA CONFIGURATION
+# ==============================================================================
+
+hydra:
+  run:
+    dir: outputs/walmart/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: outputs/walmart/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}

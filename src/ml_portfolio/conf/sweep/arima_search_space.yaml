@@ -1,0 +1,81 @@
+# ==============================================================================
+# ARIMA Hyperparameter Search Space
+# ==============================================================================
+#
+# Defines Optuna search space for ARIMA hyperparameters.
+# Auto-loaded when: model=arima and use_optuna=true
+#
+# Note: ARIMA parameters (p, d, q) are discrete and have constraints.
+# Order selection is critical for performance.
+#
+# ==============================================================================
+
+# Hydra sweeper parameters (merged into hydra.sweeper.params)
+hydra:
+  sweeper:
+    # Study configuration
+    study_name: walmart_arima_optimization
+    n_trials: 100  # More trials needed for discrete parameter space
+
+    # Search space definition
+    params:
+      # AR order (p): number of lag observations
+      +model.order.0:
+        type: int
+        low: 0
+        high: 5
+
+      # Differencing order (d): number of times to difference
+      +model.order.1:
+        type: int
+        low: 0
+        high: 2
+
+      # MA order (q): size of moving average window
+      +model.order.2:
+        type: int
+        low: 0
+        high: 5
+
+      # Seasonal AR order (P)
+      +model.seasonal_order.0:
+        type: int
+        low: 0
+        high: 2
+
+      # Seasonal differencing order (D)
+      +model.seasonal_order.1:
+        type: int
+        low: 0
+        high: 1
+
+      # Seasonal MA order (Q)
+      +model.seasonal_order.2:
+        type: int
+        low: 0
+        high: 2
+
+      # Seasonal period (m) - typically 52 for weekly data with yearly seasonality
+      +model.seasonal_order.3:
+        type: categorical
+        choices: [0, 4, 12, 52]  # None, quarterly, monthly, weekly
+
+      # Trend component
+      +model.trend:
+        type: categorical
+        choices: [null, c, t, ct]  # None, constant, trend, constant+trend
+
+      # Method for optimization
+      +model.method:
+        type: categorical
+        choices: [css-mle, mle, css]
+
+      # Whether to enforce stationarity
+      +model.enforce_stationarity:
+        type: categorical
+        choices: [true, false]
+
+      # Whether to enforce invertibility
+      +model.enforce_invertibility:
+        type: categorical
+        choices: [true, false]
