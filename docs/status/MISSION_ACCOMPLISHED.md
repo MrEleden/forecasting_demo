@@ -31,7 +31,7 @@ Your forecasting repository has been upgraded from **B-** to **A+**!
 
 ### Run Benchmark Suite
 ```bash
-python scripts/run_benchmark.py
+python src/ml_portfolio/scripts/run_benchmark.py
 ```
 
 ### Launch Dashboard
@@ -124,7 +124,7 @@ curl http://localhost:8000/models
 
 ### 1. Rapid Model Comparison
 ```bash
-python scripts/run_benchmark.py --models lightgbm,catboost,xgboost
+python src/ml_portfolio/scripts/run_benchmark.py --models lightgbm,catboost,xgboost
 streamlit run src/ml_portfolio/dashboard/app.py
 ```
 
