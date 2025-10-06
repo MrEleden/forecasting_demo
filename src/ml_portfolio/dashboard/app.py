@@ -5,10 +5,10 @@ Run with:
     streamlit run src/ml_portfolio/dashboard/app.py
 """
 
-import json
 import sys
 from pathlib import Path
 
+import mlflow
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -45,14 +45,164 @@ st.markdown(
 
 
 @st.cache_data
-def load_benchmark_data(filepath: str = "results/benchmarks/benchmark_results.json"):
-    """Load benchmark results from file."""
+def load_mlflow_runs(experiment_name=None, dataset_filter=None):
+    """
+    Load model runs directly from MLflow tracking server.
+
+    Args:
+        experiment_name: Name of MLflow experiment (optional)
+        dataset_filter: Filter by dataset name (optional)
+
+    Returns:
+        DataFrame with benchmark results from MLflow
+    """
     try:
-        with open(filepath, "r") as f:
-            data = json.load(f)
-        return pd.DataFrame(data["results"])
+        mlflow.set_tracking_uri("file:./mlruns")
+        client = mlflow.tracking.MlflowClient()
+
+        # Get experiment
+        if experiment_name:
+            experiment = client.get_experiment_by_name(experiment_name)
+            if not experiment:
+                return pd.DataFrame()
+            experiment_ids = [experiment.experiment_id]
+        else:
+            # Get all experiments except Default
+            experiments = client.search_experiments()
+            experiment_ids = [exp.experiment_id for exp in experiments if exp.name != "Default"]
+
+        if not experiment_ids:
+            return pd.DataFrame()
+
+        # Search runs across experiments
+        all_runs = []
+        for exp_id in experiment_ids:
+            runs = client.search_runs(
+                experiment_ids=[exp_id],
+                filter_string="",
+                order_by=["start_time DESC"],
+            )
+            all_runs.extend(runs)
+
+        if not all_runs:
+            return pd.DataFrame()
+
+        # Extract results
+        results = []
+        for run in all_runs:
+            metrics = run.data.metrics
+            params = run.data.params
+            tags = run.data.tags
+
+            # Get model name from tags or params
+            model_name = (
+                tags.get("model_name")
+                or tags.get("model_type")
+                or params.get("model")
+                or params.get("model._target_", "").split(".")[-1]
+                or "Unknown"
+            )
+            dataset_name = tags.get("dataset") or params.get("dataset") or params.get("dataset_name") or "Unknown"
+
+            # Apply filter
+            if dataset_filter and dataset_name.lower() != dataset_filter.lower():
+                continue
+
+            # Try different metric naming conventions
+            mape = (
+                metrics.get("test_mape")
+                or metrics.get("mape")
+                or metrics.get("test_MAPEMetric")
+                or metrics.get("MAPEMetric")
+            )
+            rmse = (
+                metrics.get("test_rmse")
+                or metrics.get("rmse")
+                or metrics.get("test_RMSEMetric")
+                or metrics.get("RMSEMetric")
+            )
+            mae = (
+                metrics.get("test_mae")
+                or metrics.get("mae")
+                or metrics.get("test_MAEMetric")
+                or metrics.get("MAEMetric")
+            )
+
+            result = {
+                "model_name": model_name,
+                "dataset_name": dataset_name,
+                "mape": mape,
+                "rmse": rmse,
+                "mae": mae,
+                "training_time": metrics.get("training_time", 0),
+                "prediction_time": 0.01,  # Default value
+                "run_id": run.info.run_id,
+                "experiment_id": run.info.experiment_id,
+                "start_time": pd.to_datetime(run.info.start_time, unit="ms"),
+                "n_samples": 1000,  # Default value
+                "n_features": 6,  # Default value
+            }
+
+            # Only include if has at least one metric
+            if any(result[m] is not None for m in ["mape", "rmse", "mae"]):
+                results.append(result)
+
+        df = pd.DataFrame(results)
+
+        if df.empty:
+            return df
+
+        # Sort by start_time and keep most recent run per model+dataset
+        df = df.sort_values("start_time", ascending=False)
+        df = df.groupby(["model_name", "dataset_name"]).first().reset_index()
+
+        return df
+
+    except Exception as e:
+        st.error(f"Error loading MLflow data: {e}")
+        return pd.DataFrame()
+
+
+@st.cache_data
+def load_benchmark_data_from_json(filepath: str = "results/benchmarks/mlflow_benchmark_results.json"):
+    """Load benchmark results from JSON file (fallback)."""
+    try:
+        df = pd.read_json(filepath)
+        return df
     except FileNotFoundError:
         return None
+    except Exception:
+        return None
+
+
+@st.cache_data
+def get_mlflow_experiments():
+    """Get list of MLflow experiment names."""
+    try:
+        mlflow.set_tracking_uri("file:./mlruns")
+        client = mlflow.tracking.MlflowClient()
+        experiments = client.search_experiments()
+        return [exp.name for exp in experiments if exp.name != "Default"]
+    except Exception:
+        return []
+
+
+def load_benchmark_data(data_source="MLflow (Live)", experiment_name=None, dataset_filter=None):
+    """
+    Load benchmark data from MLflow or JSON.
+
+    Args:
+        data_source: 'MLflow (Live)' or 'JSON (Cache)'
+        experiment_name: MLflow experiment name (optional)
+        dataset_filter: Filter by dataset (optional)
+
+    Returns:
+        DataFrame with benchmark results
+    """
+    if data_source == "MLflow (Live)":
+        return load_mlflow_runs(experiment_name=experiment_name, dataset_filter=dataset_filter)
+    else:
+        return load_benchmark_data_from_json()
 
 
 @st.cache_data
@@ -77,6 +227,20 @@ def main():
         "Select Page",
         ["Overview", "Model Comparison", "Predictions Explorer", "Benchmark Results"],
     )
+
+    # Data source selection
+    st.sidebar.markdown("---")
+    st.sidebar.header("Data Source")
+    data_source = st.sidebar.radio("Load data from:", ["MLflow (Live)", "JSON (Cache)"], index=0)
+
+    # Experiment filter (for MLflow)
+    experiment_name = None
+    if data_source == "MLflow (Live)":
+        st.sidebar.subheader("MLflow Filters")
+        experiment_options = ["All Experiments"] + get_mlflow_experiments()
+        selected_exp = st.sidebar.selectbox("Experiment", experiment_options)
+        if selected_exp != "All Experiments":
+            experiment_name = selected_exp
 
     # ========================================================================
     # OVERVIEW PAGE
@@ -130,9 +294,9 @@ def main():
         st.subheader("Quick Stats")
 
         # Load benchmark data if available
-        df_benchmark = load_benchmark_data()
+        df_benchmark = load_benchmark_data(data_source, experiment_name)
 
-        if df_benchmark is not None:
+        if df_benchmark is not None and not df_benchmark.empty:
             col1, col2, col3, col4 = st.columns(4)
 
             with col1:
@@ -150,8 +314,21 @@ def main():
             with col4:
                 total_runs = len(df_benchmark)
                 st.metric("Total Benchmark Runs", total_runs)
+
+            # Show data source info
+            st.info(
+                f"📊 Data loaded from: **{data_source}**"
+                + (f" (Experiment: {experiment_name})" if experiment_name else " (All experiments)")
+            )
         else:
-            st.info("Run benchmark suite to see statistics: `python scripts/run_benchmark.py`")
+            st.info(
+                "No benchmark data found. "
+                + (
+                    "Train some models to populate MLflow experiments."
+                    if data_source == "MLflow (Live)"
+                    else "Run: `python src/ml_portfolio/scripts/run_benchmark.py`"
+                )
+            )
 
     # ========================================================================
     # MODEL COMPARISON PAGE
@@ -159,10 +336,17 @@ def main():
     elif page == "Model Comparison":
         st.header("Model Comparison")
 
-        df_benchmark = load_benchmark_data()
+        df_benchmark = load_benchmark_data(data_source, experiment_name)
 
-        if df_benchmark is None:
-            st.warning("No benchmark results found. Please run: `python scripts/run_benchmark.py`")
+        if df_benchmark is None or df_benchmark.empty:
+            st.warning(
+                "No benchmark results found. "
+                + (
+                    "Check MLflow experiments or train some models first."
+                    if data_source == "MLflow (Live)"
+                    else "Please run: `python src/ml_portfolio/scripts/run_benchmark.py`"
+                )
+            )
             return
 
         # Filters
@@ -401,11 +585,19 @@ def main():
     elif page == "Benchmark Results":
         st.header("Benchmark Results")
 
-        df_benchmark = load_benchmark_data()
+        df_benchmark = load_benchmark_data(data_source, experiment_name)
 
-        if df_benchmark is None:
-            st.warning("No benchmark results found. Please run: `python scripts/run_benchmark.py`")
-            st.code("python scripts/run_benchmark.py", language="bash")
+        if df_benchmark is None or df_benchmark.empty:
+            st.warning(
+                "No benchmark results found. "
+                + (
+                    "Check MLflow experiments or train some models first."
+                    if data_source == "MLflow (Live)"
+                    else "Please run: `python src/ml_portfolio/scripts/run_benchmark.py`"
+                )
+            )
+            if data_source != "MLflow (Live)":
+                st.code("python src/ml_portfolio/scripts/run_benchmark.py", language="bash")
             return
 
         # Summary statistics
