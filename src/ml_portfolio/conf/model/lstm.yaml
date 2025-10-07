@@ -12,7 +12,7 @@ defaults:
 
 model:
   # Model instantiation
-  _target_: ml_portfolio.models.deep_learning.lstm.LSTMForecaster
+  _target_: ml_portfolio.models.pytorch.lstm.LSTMForecaster
 
   # LSTM architecture
   input_size: 1  # Will be set based on dataset

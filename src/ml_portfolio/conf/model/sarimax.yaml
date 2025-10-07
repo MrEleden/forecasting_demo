@@ -1,0 +1,76 @@
+# SARIMAX Model Configuration
+
+model:
+  _target_: ml_portfolio.models.statistical.sarimax.SARIMAXForecaster
+
+  # Non-seasonal ARIMA component (p, d, q)
+  order: [1, 1, 1]
+
+  # Seasonal component (P, D, Q, s)
+  # s=12 for monthly data with yearly seasonality
+  # s=7 for daily data with weekly seasonality
+  # s=52 for weekly data with yearly seasonality
+  seasonal_order: [1, 1, 1, 12]
+
+  # Trend component: null, 'c' (constant), 't' (linear), 'ct' (both)
+  trend: null
+
+  # Advanced options
+  measurement_error: false
+  time_varying_regression: false
+  mle_regression: true
+
+  # Optimization
+  method: lbfgs
+  maxiter: 100
+
+  # Constraints
+  enforce_stationarity: true
+  enforce_invertibility: true
+
+  # Suppress convergence warnings
+  suppress_warnings: true
+
+# Optuna hyperparameter search space
+optuna:
+  # Non-seasonal AR order
+  p_min: 0
+  p_max: 3
+
+  # Non-seasonal differencing
+  d_min: 0
+  d_max: 2
+
+  # Non-seasonal MA order
+  q_min: 0
+  q_max: 3
+
+  # Seasonal AR order
+  P_min: 0
+  P_max: 2
+
+  # Seasonal differencing
+  D_min: 0
+  D_max: 1
+
+  # Seasonal MA order
+  Q_min: 0
+  Q_max: 2
+
+  # Seasonal period (categorical)
+  seasonal_periods: [7, 12, 52]  # Weekly, Monthly, Yearly
+
+  # Trend component
+  trends: [null, 'c', 't']
+
+  # Maxiter
+  maxiter_min: 50
+  maxiter_max: 200
+
+# Model metadata
+metadata:
+  family: statistical
+  type: sarimax
+  supports_exog: true
+  supports_intervals: true
+  requires_stationarity: false  # Can handle via differencing

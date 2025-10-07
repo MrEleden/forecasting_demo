@@ -99,15 +99,15 @@ class ProphetForecaster(StatisticalForecaster):
         self.date_column_ = None
         self.feature_names_ = None
 
-    def fit(
+    def _fit(
         self,
         X: Union[np.ndarray, pd.DataFrame],
         y: Union[np.ndarray, pd.Series],
         date_column: Optional[str] = None,
         **fit_kwargs,
-    ) -> "ProphetForecaster":
+    ):
         """
-        Fit the Prophet model.
+        Internal fit method for Prophet model.
 
         Prophet expects data in a specific format with 'ds' (date) and 'y' (target) columns.
         If X contains a date column, specify it with date_column parameter.
@@ -117,9 +117,6 @@ class ProphetForecaster(StatisticalForecaster):
             y: Training target (n_samples,)
             date_column: Name of the date column in X (if DataFrame)
             **fit_kwargs: Additional fit parameters
-
-        Returns:
-            self: Fitted model
         """
         # Convert inputs to DataFrame format expected by Prophet
         if isinstance(X, pd.DataFrame):
@@ -192,8 +189,6 @@ class ProphetForecaster(StatisticalForecaster):
 
         # Mark as fitted
         self.is_fitted = True
-
-        return self
 
     def predict(self, X: Union[np.ndarray, pd.DataFrame]) -> np.ndarray:
         """

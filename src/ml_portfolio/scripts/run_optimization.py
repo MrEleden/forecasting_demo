@@ -19,10 +19,18 @@ import sys
 
 # Available models with their optuna config names
 AVAILABLE_MODELS = {
+    # Statistical/Tree-based models
     "lightgbm": "lightgbm",
     "xgboost": "xgboost",
     "catboost": "catboost",
     "random_forest": "random_forest",
+    # PyTorch deep learning models
+    "lstm": "lstm",
+    "tcn": "tcn",
+    "transformer": "transformer",
+    # Ensemble models
+    "voting": "voting",
+    "stacking": "stacking",
 }
 
 
@@ -83,11 +91,14 @@ Examples:
   # Run all models with 20 trials each
   python run_optimization.py --trials 20
 
-  # Run only LightGBM and XGBoost
+  # Run only LightGBM and XGBoost (tree-based models)
   python run_optimization.py --models lightgbm xgboost
 
-  # Run Random Forest with 100 trials
-  python run_optimization.py --models random_forest --trials 100
+  # Run PyTorch deep learning models
+  python run_optimization.py --models lstm tcn transformer
+
+  # Run LSTM with 100 trials
+  python run_optimization.py --models lstm --trials 100
 
   # Dry run to see commands without executing
   python run_optimization.py --dry-run

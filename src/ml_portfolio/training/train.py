@@ -179,6 +179,15 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     # PHASE 4: INSTANTIATE MODEL
     # ========================================================================
     logger.info("Phase 4: Instantiating model...")
+
+    # For PyTorch models, set input_size from actual feature dimension
+    feature_dim = train_dataset.get_feature_dim()
+    if "input_size" in cfg.model:
+        logger.info(
+            f"Overriding model.input_size from config ({cfg.model.input_size}) with feature_dim ({feature_dim})"
+        )
+        cfg.model.input_size = feature_dim
+
     logger.info(f"Model configuration:\n{OmegaConf.to_yaml(cfg)}")
     model = instantiate(cfg.model)
     logger.info(f"Model: {type(model).__name__}")
@@ -217,6 +226,9 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     mlflow_tracker = None
     if MLFLOW_AVAILABLE and cfg.get("use_mlflow", False):
         mlflow.set_experiment(cfg.get("experiment_name", "forecasting"))
+        # End any existing run before starting a new one
+        if mlflow.active_run() is not None:
+            mlflow.end_run()
         mlflow.start_run(run_name=cfg.get("run_name", None))
 
         # Flatten and log parameters (MLflow needs flat key-value pairs)

@@ -134,6 +134,7 @@ class StaticTimeSeriesPreprocessingPipeline:
         rolling_windows: list = None,
         date_features: bool = True,
         cyclical_features: list = None,
+        fillna_value: float = 0.0,  # Value to fill NaN (0 for neutral after scaling)
     ):
         self.date_column = date_column
         self.group_columns = group_columns or []
@@ -142,6 +143,7 @@ class StaticTimeSeriesPreprocessingPipeline:
         self.rolling_windows = rolling_windows or [7, 30]
         self.date_features = date_features
         self.cyclical_features = cyclical_features or []
+        self.fillna_value = fillna_value
 
     def engineer_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -165,6 +167,10 @@ class StaticTimeSeriesPreprocessingPipeline:
         # Cyclical encoding (deterministic - safe)
         if self.cyclical_features:
             df = self._add_cyclical_features(df)
+
+        # Fill NaN values created by lag/rolling features
+        # This is safe because we're filling with a neutral value (0 after scaling)
+        df = df.fillna(self.fillna_value)
 
         return df
 

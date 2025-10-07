@@ -97,11 +97,10 @@ class XGBoostForecaster(StatisticalForecaster):
         self.kwargs = kwargs
 
         # Will be initialized in fit()
-        self.model = None
         self.feature_names_ = None
         self.feature_importances_ = None
 
-    def fit(
+    def _fit(
         self,
         X: np.ndarray,
         y: np.ndarray,
@@ -109,9 +108,9 @@ class XGBoostForecaster(StatisticalForecaster):
         eval_metric: Optional[str] = None,
         verbose: bool = False,
         **fit_kwargs,
-    ) -> "XGBoostForecaster":
+    ):
         """
-        Fit the XGBoost model.
+        Internal fit method for XGBoost model.
 
         Args:
             X: Training features (n_samples, n_features)
@@ -120,9 +119,6 @@ class XGBoostForecaster(StatisticalForecaster):
             eval_metric: Metric to use for validation ('rmse', 'mae', 'mape', etc.)
             verbose: Whether to print training progress
             **fit_kwargs: Additional fit parameters
-
-        Returns:
-            self: Fitted model
         """
         # Store feature names if available
         if isinstance(X, pd.DataFrame):
@@ -172,8 +168,6 @@ class XGBoostForecaster(StatisticalForecaster):
 
         # Mark as fitted
         self.is_fitted = True
-
-        return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """

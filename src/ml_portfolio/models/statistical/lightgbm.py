@@ -104,16 +104,16 @@ class LightGBMForecaster(StatisticalForecaster):
         self.feature_names_ = None
         self.feature_importances_ = None
 
-    def fit(
+    def _fit(
         self,
         X: np.ndarray,
         y: np.ndarray,
         eval_set: Optional[list] = None,
         eval_names: Optional[list] = None,
         **fit_kwargs,
-    ) -> "LightGBMForecaster":
+    ):
         """
-        Fit the LightGBM model.
+        Internal fit method for LightGBM model.
 
         Args:
             X: Training features (n_samples, n_features)
@@ -121,9 +121,6 @@ class LightGBMForecaster(StatisticalForecaster):
             eval_set: List of (X, y) tuples for validation
             eval_names: Names for evaluation sets
             **fit_kwargs: Additional fit parameters
-
-        Returns:
-            self: Fitted model
         """
         # Store feature names if available
         if isinstance(X, pd.DataFrame):
@@ -177,8 +174,6 @@ class LightGBMForecaster(StatisticalForecaster):
 
         # Mark as fitted
         self.is_fitted = True
-
-        return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """

@@ -1,0 +1,35 @@
+# @package hydra.sweeper
+# ==============================================================================
+# Voting Ensemble Optuna Search Space
+# ==============================================================================
+#
+# Usage:
+#   python src/ml_portfolio/training/train.py --config-name walmart model=voting \
+#     use_optuna=true hydra/sweeper=optuna +optuna=voting --multirun
+#
+# ==============================================================================
+
+study_name: walmart_voting_${now:%Y%m%d_%H%M%S}
+direction: minimize
+n_trials: 50
+n_jobs: 1
+
+# Search space definition
+params:
+  # Voting configuration
+  model.voting_type: choice(mean, median)
+
+  # Base model hyperparameters - LightGBM
+  model.models.0.1.n_estimators: range(50, 300, 50)
+  model.models.0.1.learning_rate: interval(0.01, 0.3)
+  model.models.0.1.max_depth: range(3, 10)
+
+  # Base model hyperparameters - XGBoost
+  model.models.1.1.n_estimators: range(50, 300, 50)
+  model.models.1.1.learning_rate: interval(0.01, 0.3)
+  model.models.1.1.max_depth: range(3, 10)
+
+  # Base model hyperparameters - CatBoost
+  model.models.2.1.iterations: range(50, 300, 50)
+  model.models.2.1.learning_rate: interval(0.01, 0.3)
+  model.models.2.1.depth: range(3, 10)

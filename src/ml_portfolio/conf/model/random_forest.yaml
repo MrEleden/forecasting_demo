@@ -1,7 +1,7 @@
 # @package _global_
 
 # Random Forest Model Configuration
-# Sklearn ensemble model for forecasting
+# Wrapped sklearn ensemble model for forecasting
 # Dataloader and engine specified via defaults
 
 defaults:
@@ -10,14 +10,14 @@ defaults:
 
 model:
   # Model instantiation
-  _target_: sklearn.ensemble.RandomForestRegressor
+  _target_: ml_portfolio.models.statistical.random_forest.RandomForestForecaster
 
   # Random Forest parameters
   n_estimators: 100
   max_depth: 10
   min_samples_split: 2
   min_samples_leaf: 1
-  max_features: sqrt
+  max_features: 1.0  # Changed from 'sqrt' to float for Optuna compatibility
   bootstrap: true
   random_state: 42
   n_jobs: -1

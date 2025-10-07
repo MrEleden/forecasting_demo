@@ -1,0 +1,80 @@
+# Optuna hyperparameter optimization configuration for Transformer
+# Search space for Transformer time series forecasting
+
+sampler:
+  _target_: optuna.samplers.TPESampler
+  seed: 42
+  n_startup_trials: 10
+
+pruner:
+  _target_: optuna.pruners.MedianPruner
+  n_startup_trials: 5
+  n_warmup_steps: 10
+
+search_space:
+  # Transformer architecture
+  model.d_model:
+    type: categorical
+    choices: [64, 128, 256]
+
+  model.nhead:
+    type: categorical
+    choices: [4, 8]
+
+  model.num_encoder_layers:
+    type: int
+    low: 1
+    high: 4
+
+  model.num_decoder_layers:
+    type: int
+    low: 1
+    high: 4
+
+  model.dim_feedforward:
+    type: categorical
+    choices: [256, 512, 1024]
+
+  model.dropout:
+    type: float
+    low: 0.0
+    high: 0.5
+    step: 0.1
+
+  # Training hyperparameters
+  model.learning_rate:
+    type: loguniform
+    low: 0.0001
+    high: 0.01
+
+  engine.epochs:
+    type: categorical
+    choices: [50, 100, 150, 200]
+
+  # Optimizer
+  optimizer.weight_decay:
+    type: loguniform
+    low: 0.00001
+    high: 0.001
+
+  # Data processing
+  dataloader.batch_size:
+    type: categorical
+    choices: [16, 32, 64]
+
+  dataloader.window_size:
+    type: int
+    low: 7
+    high: 30
+    step: 7
+
+  dataloader.forecast_horizon:
+    type: int
+    low: 1
+    high: 14
+
+# Optimization direction
+direction: minimize
+
+# Metric to optimize
+metric: val_MAPE

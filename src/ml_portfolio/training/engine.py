@@ -315,25 +315,25 @@ class StatisticalEngine(BaseEngine):
 
         start_time = time.time()
 
-        # Iterate over training loader (single iteration for full data)
+        # Pass dataloaders to model - model handles iteration internally
+        self.model.fit(self.train_loader, self.val_loader)
+
+        # Compute training metrics after fitting
+        train_metrics = {}
         for X_train, y_train in self.train_loader:
-            if self.verbose:
-                logger.info(f"Training data shape: X={X_train.shape}, y={y_train.shape}")
-
-            # Fit model (single call)
-            self.model.fit(X_train, y_train)
-
-            # Compute training metrics
             y_pred_train = self.model.predict(X_train)
             train_metrics = self._compute_metrics(y_train, y_pred_train, prefix="train_")
             self.history["train_metrics"].append(train_metrics)
+            break  # Single iteration for statistical models
 
         # Compute validation metrics if available
         val_metrics = {}
         if self.val_loader is not None:
-            val_metrics = self.evaluate(self.val_loader)
-            val_metrics = {f"val_{k}": v for k, v in val_metrics.items()}
-            self.history["val_metrics"].append(val_metrics)
+            for X_val, y_val in self.val_loader:
+                y_pred_val = self.model.predict(X_val)
+                val_metrics = self._compute_metrics(y_val, y_pred_val, prefix="val_")
+                self.history["val_metrics"].append(val_metrics)
+                break  # Single iteration for statistical models
 
         # Training time
         training_time = time.time() - start_time
@@ -515,6 +515,243 @@ class StatisticalEngine(BaseEngine):
             checkpoint = pickle.load(f)
 
         self.model = checkpoint["model"]
+        self.history = checkpoint.get("history", self.history)
+
+        if self.verbose:
+            logger.info(f"Loaded model from {path}")
+
+
+class PyTorchEngine(BaseEngine):
+    """
+    Training engine for PyTorch-based deep learning models.
+    Handles multi-epoch training with optimization, validation, and checkpointing.
+    """
+
+    def __init__(
+        self,
+        model,
+        train_loader=None,
+        val_loader=None,
+        test_loader=None,
+        mlflow_tracker: Optional[Any] = None,
+        checkpoint_dir: Optional[Path] = None,
+        verbose: bool = True,
+        **kwargs,
+    ):
+        """
+        Initialize PyTorch engine.
+
+        Args:
+            model: PyTorch model (inherits from PyTorchForecaster)
+            train_loader: Training data loader
+            val_loader: Validation data loader
+            test_loader: Test data loader
+            mlflow_tracker: MLflow tracker for experiment logging
+            checkpoint_dir: Directory to save checkpoints
+            verbose: Whether to log progress
+        """
+        super().__init__(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            mlflow_tracker=mlflow_tracker,
+            checkpoint_dir=checkpoint_dir,
+            verbose=verbose,
+            **kwargs,
+        )
+
+    def train(self, epochs: int = 100, learning_rate: float = 0.001, **kwargs) -> Dict[str, Any]:
+        """
+        Train PyTorch model for multiple epochs.
+
+        Args:
+            epochs: Number of training epochs
+            learning_rate: Learning rate for optimizer
+            **kwargs: Additional training parameters
+
+        Returns:
+            Dictionary with training results
+        """
+        if self.train_loader is None:
+            raise ValueError("No training data loader provided")
+
+        if self.verbose:
+            logger.info("=" * 60)
+            logger.info(f"Training {self.model.__class__.__name__}")
+            logger.info(f"Epochs: {epochs}, Learning Rate: {learning_rate}")
+            logger.info("=" * 60)
+
+        start_time = time.time()
+
+        # Model owns the training logic - just pass the loaders
+        self.model.fit(
+            train_loader=self.train_loader,
+            val_loader=self.val_loader,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            verbose=self.verbose,
+            **kwargs,
+        )
+
+        # Compute metrics after training
+        training_time = time.time() - start_time
+
+        # Evaluate on training set
+        train_metrics = self.evaluate(self.train_loader, prefix="train_")
+        self.history["train_metrics"].append(train_metrics)
+
+        # Evaluate on validation set if available
+        val_metrics = {}
+        if self.val_loader is not None:
+            val_metrics = self.evaluate(self.val_loader, prefix="val_")
+            self.history["val_metrics"].append(val_metrics)
+
+        self.history["epoch_times"].append(training_time)
+
+        # Log to MLflow
+        if self.mlflow_tracker:
+            all_metrics = {**train_metrics, **val_metrics}
+            all_metrics["training_time"] = training_time
+            try:
+                self.mlflow_tracker.log_metrics(all_metrics)
+            except Exception as e:
+                logger.warning(f"Failed to log metrics to MLflow: {e}")
+
+        # Save checkpoint
+        if self.checkpoint_dir:
+            self.save_checkpoint(is_best=True)
+
+        if self.verbose:
+            logger.info(f"Training completed in {training_time:.2f}s")
+            for metric_name, value in train_metrics.items():
+                logger.info(f"  {metric_name}: {value:.4f}")
+            for metric_name, value in val_metrics.items():
+                logger.info(f"  {metric_name}: {value:.4f}")
+
+        return {
+            "history": self.history,
+            "training_time": training_time,
+            "converged": True,
+            "train_metrics": train_metrics,
+            "val_metrics": val_metrics,
+        }
+
+    def test(self) -> Dict[str, float]:
+        """
+        Evaluate model on test set.
+
+        Returns:
+            Test metrics dictionary
+        """
+        if self.test_loader is None:
+            raise ValueError("No test loader provided")
+
+        if self.verbose:
+            logger.info("Evaluating on test set...")
+
+        return self.evaluate(self.test_loader, prefix="test_")
+
+    def evaluate(self, data_loader, prefix: str = "val_") -> Dict[str, float]:
+        """
+        Evaluate model on a data loader.
+
+        Args:
+            data_loader: DataLoader to evaluate
+            prefix: Prefix for metric names
+
+        Returns:
+            Dictionary of metrics
+        """
+        self.model.eval()
+        all_y_true = []
+        all_y_pred = []
+
+        # Collect predictions
+        for X_batch, y_batch in data_loader:
+            y_pred = self.model.predict(X_batch)
+            all_y_true.append(y_batch)
+            all_y_pred.append(y_pred)
+
+        # Concatenate all batches
+        y_true = np.concatenate(all_y_true, axis=0)
+        y_pred = np.concatenate(all_y_pred, axis=0)
+
+        # Compute metrics
+        metrics = self._compute_metrics(y_true, y_pred, prefix=prefix)
+
+        return metrics
+
+    def _compute_metrics(self, y_true: np.ndarray, y_pred: np.ndarray, prefix: str = "") -> Dict[str, float]:
+        """
+        Compute evaluation metrics.
+
+        Args:
+            y_true: True values
+            y_pred: Predicted values
+            prefix: Prefix for metric names
+
+        Returns:
+            Dictionary of metrics
+        """
+        from ml_portfolio.evaluation.metrics import mae, mape, rmse
+
+        # Flatten arrays
+        y_true = np.asarray(y_true).ravel()
+        y_pred = np.asarray(y_pred).ravel()
+
+        # Ensure same length
+        min_len = min(len(y_true), len(y_pred))
+        y_true = y_true[:min_len]
+        y_pred = y_pred[:min_len]
+
+        results = {}
+        try:
+            results[f"{prefix}MAPE"] = float(mape(y_true, y_pred))
+        except (ValueError, ZeroDivisionError):
+            results[f"{prefix}MAPE"] = float("nan")
+
+        try:
+            results[f"{prefix}RMSE"] = float(rmse(y_true, y_pred))
+        except (ValueError, ZeroDivisionError):
+            results[f"{prefix}RMSE"] = float("nan")
+
+        try:
+            results[f"{prefix}MAE"] = float(mae(y_true, y_pred))
+        except (ValueError, ZeroDivisionError):
+            results[f"{prefix}MAE"] = float("nan")
+
+        return results
+
+    def _save_model_state(self, path: Path):
+        """
+        Save PyTorch model state dict.
+
+        Args:
+            path: Path to save model
+        """
+        import torch
+
+        torch.save(
+            {
+                "model_state_dict": self.model.state_dict(),
+                "history": self.history,
+            },
+            path,
+        )
+
+    def load_checkpoint(self, path: Path):
+        """
+        Load PyTorch model from checkpoint.
+
+        Args:
+            path: Path to load model from
+        """
+        import torch
+
+        checkpoint = torch.load(path, map_location=self.model.device)
+
+        self.model.load_state_dict(checkpoint["model_state_dict"])
         self.history = checkpoint.get("history", self.history)
 
         if self.verbose:

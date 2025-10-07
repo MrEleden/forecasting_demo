@@ -1,0 +1,39 @@
+# @package hydra.sweeper
+# ==============================================================================
+# Stacking Ensemble Optuna Search Space
+# ==============================================================================
+#
+# Usage:
+#   python src/ml_portfolio/training/train.py --config-name walmart model=stacking \
+#     use_optuna=true hydra/sweeper=optuna +optuna=stacking --multirun
+#
+# ==============================================================================
+
+study_name: walmart_stacking_${now:%Y%m%d_%H%M%S}
+direction: minimize
+n_trials: 50
+n_jobs: 1
+
+# Search space definition
+params:
+  # Stacking configuration
+  model.use_features: choice(true, false)
+  model.cv_folds: choice(3, 5, 10)
+
+  # Meta-learner hyperparameters (Ridge)
+  model.meta_model.alpha: interval(0.01, 10.0)
+
+  # Base model hyperparameters - LightGBM
+  model.base_models.0.1.n_estimators: range(50, 300, 50)
+  model.base_models.0.1.learning_rate: interval(0.01, 0.3)
+  model.base_models.0.1.max_depth: range(3, 10)
+
+  # Base model hyperparameters - XGBoost
+  model.base_models.1.1.n_estimators: range(50, 300, 50)
+  model.base_models.1.1.learning_rate: interval(0.01, 0.3)
+  model.base_models.1.1.max_depth: range(3, 10)
+
+  # Base model hyperparameters - CatBoost
+  model.base_models.2.1.iterations: range(50, 300, 50)
+  model.base_models.2.1.learning_rate: interval(0.01, 0.3)
+  model.base_models.2.1.depth: range(3, 10)

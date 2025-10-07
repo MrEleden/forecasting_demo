@@ -1,0 +1,65 @@
+# @package _global_
+
+# TCN (Temporal Convolutional Network) Configuration
+# Deep learning time series model
+# Dataloader, engine, optimizer, and scheduler specified via defaults
+
+defaults:
+  - /dataloader: pytorch
+  - /engine: pytorch
+  - /optimizer: adam
+  - /scheduler: cosine
+
+model:
+  # Model instantiation
+  _target_: ml_portfolio.models.pytorch.tcn.TCNForecaster
+
+  # Architecture
+  input_size: 1  # Will be set based on dataset
+  output_size: 1  # Forecast horizon
+  num_channels: [32, 64, 128]  # Channel sizes for each TCN level
+  kernel_size: 3  # Convolutional kernel size
+  dropout: 0.2
+
+  # Training (will be used by engine)
+  learning_rate: 0.001
+
+# Optuna hyperparameter search space
+optuna:
+  # Architecture search
+  num_levels_min: 2
+  num_levels_max: 4
+
+  channels_base_min: 16
+  channels_base_max: 128
+  channels_multiplier: 2  # Each level doubles channels
+
+  kernel_size_options: [2, 3, 5, 7]
+
+  # Regularization
+  dropout_min: 0.1
+  dropout_max: 0.5
+
+  # Training
+  learning_rate_min: 0.0001
+  learning_rate_max: 0.01
+  learning_rate_log: true
+
+  batch_size_options: [16, 32, 64, 128]
+
+  num_epochs_min: 50
+  num_epochs_max: 200
+
+# Model metadata
+metadata:
+  family: deep_learning
+  type: tcn
+  framework: pytorch
+  supports_multivariate: true
+  supports_exog: true
+  parallelizable: true
+  good_for:
+    - long_sequences
+    - high_frequency
+    - multivariate
+    - real_time

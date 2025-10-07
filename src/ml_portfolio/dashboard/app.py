@@ -34,9 +34,25 @@ st.markdown(
         padding: 0rem 1rem;
     }
     .stMetric {
-        background-color: #f0f2f6;
-        padding: 15px;
-        border-radius: 5px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    .stMetric label {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+    }
+    .stMetric [data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        font-size: 2rem !important;
+        font-weight: 700 !important;
+    }
+    .stMetric [data-testid="stMetricDelta"] {
+        color: #a8ff78 !important;
+        font-weight: 600 !important;
     }
 </style>
 """,

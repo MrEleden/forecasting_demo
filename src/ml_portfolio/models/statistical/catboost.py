@@ -95,16 +95,16 @@ class CatBoostForecaster(StatisticalForecaster):
         self.feature_names_ = None
         self.feature_importances_ = None
 
-    def fit(
+    def _fit(
         self,
         X: np.ndarray,
         y: np.ndarray,
         eval_set: Optional[tuple] = None,
         cat_features: Optional[list] = None,
         **fit_kwargs,
-    ) -> "CatBoostForecaster":
+    ):
         """
-        Fit the CatBoost model.
+        Internal fit method for CatBoost model.
 
         Args:
             X: Training features (n_samples, n_features)
@@ -112,9 +112,6 @@ class CatBoostForecaster(StatisticalForecaster):
             eval_set: Tuple of (X_val, y_val) for validation
             cat_features: List of categorical feature indices or names
             **fit_kwargs: Additional fit parameters
-
-        Returns:
-            self: Fitted model
         """
         # Store feature names if available
         if isinstance(X, pd.DataFrame):
@@ -174,8 +171,6 @@ class CatBoostForecaster(StatisticalForecaster):
 
         # Mark as fitted
         self.is_fitted = True
-
-        return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
