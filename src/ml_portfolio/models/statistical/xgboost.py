@@ -97,6 +97,7 @@ class XGBoostForecaster(StatisticalForecaster):
         self.kwargs = kwargs
 
         # Will be initialized in fit()
+        self.model = None
         self.feature_names_ = None
         self.feature_importances_ = None
 
@@ -133,30 +134,34 @@ class XGBoostForecaster(StatisticalForecaster):
         if y.ndim > 1:
             y = y.ravel()
 
-        # Initialize model
-        self.model = xgb.XGBRegressor(
-            n_estimators=self.n_estimators,
-            learning_rate=self.learning_rate,
-            max_depth=self.max_depth,
-            min_child_weight=self.min_child_weight,
-            subsample=self.subsample,
-            colsample_bytree=self.colsample_bytree,
-            gamma=self.gamma,
-            reg_alpha=self.reg_alpha,
-            reg_lambda=self.reg_lambda,
-            tree_method=self.tree_method,
-            n_jobs=self.n_jobs,
-            random_state=self.random_state,
-            verbosity=self.verbosity,
+        # Initialize model with early_stopping_rounds in constructor (XGBoost 1.6+)
+        model_params = {
+            "n_estimators": self.n_estimators,
+            "learning_rate": self.learning_rate,
+            "max_depth": self.max_depth,
+            "min_child_weight": self.min_child_weight,
+            "subsample": self.subsample,
+            "colsample_bytree": self.colsample_bytree,
+            "gamma": self.gamma,
+            "reg_alpha": self.reg_alpha,
+            "reg_lambda": self.reg_lambda,
+            "tree_method": self.tree_method,
+            "n_jobs": self.n_jobs,
+            "random_state": self.random_state,
+            "verbosity": self.verbosity,
             **self.kwargs,
-        )
+        }
+
+        # Add early_stopping_rounds to constructor if eval_set provided
+        if eval_set is not None and self.early_stopping_rounds is not None:
+            model_params["early_stopping_rounds"] = self.early_stopping_rounds
+
+        self.model = xgb.XGBRegressor(**model_params)
 
         # Fit model
         fit_params = fit_kwargs.copy()
         if eval_set is not None:
             fit_params["eval_set"] = eval_set
-            if self.early_stopping_rounds is not None:
-                fit_params["early_stopping_rounds"] = self.early_stopping_rounds
             if eval_metric is not None:
                 fit_params["eval_metric"] = eval_metric
             fit_params["verbose"] = verbose
