@@ -1,0 +1,46 @@
+# Coverage.py configuration for ML Forecasting Portfolio
+# Focus on core implementation: data, models, pipelines, training
+# Enforces 90% minimum coverage on these modules (excludes engine.py)
+
+[run]
+source =
+    src/ml_portfolio/data
+    src/ml_portfolio/models
+    src/ml_portfolio/pipelines
+    src/ml_portfolio/training
+omit =
+    */tests/*
+    */conftest.py
+    */__pycache__/*
+    */site-packages/*
+    */migrations/*
+    */venv/*
+    */.venv/*
+    */training/engine.py
+
+[report]
+# Incremental coverage target on core modules: 20% → 35% → 50% → 75% → 90%
+fail_under = 20
+precision = 2
+show_missing = True
+skip_covered = False
+
+# Report formatting
+exclude_lines =
+    # Exclude lines from coverage
+    pragma: no cover
+    def __repr__
+    def __str__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod
+    pass
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml

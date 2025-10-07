@@ -40,14 +40,25 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
 
-  # pytest - Run tests before commit (optional, can be slow)
-  # Uncomment to enable:
+  # pytest with coverage - Optional coverage reporting (not enforced)
+  # Focus on core implementation: data, models, pipelines, training
+  # Note: engine.py is excluded from coverage (complex PyTorch training loops)
+  # To enable enforcement, uncomment and set desired threshold
   # - repo: local
   #   hooks:
-  #     - id: pytest-check
-  #       name: pytest
+  #     - id: pytest-coverage
+  #       name: pytest with coverage reporting
   #       entry: pytest
   #       language: system
   #       pass_filenames: false
   #       always_run: true
-  #       args: ['tests/', '-v']
+  #       args: [
+  #         'tests/unit/', '-v',
+  #         '--cov=src/ml_portfolio/data',
+  #         '--cov=src/ml_portfolio/models',
+  #         '--cov=src/ml_portfolio/pipelines',
+  #         '--cov=src/ml_portfolio/training',
+  #         '--cov-report=term-missing',
+  #         # '--cov-fail-under=20'  # Uncomment to enforce threshold
+  #       ]
+  #       stages: [pre-commit]
