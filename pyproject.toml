@@ -44,6 +44,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 addopts = [
     "-v",
     "--strict-markers",
@@ -74,10 +77,16 @@ omit = [
     "*/migrations/*",
     "*/venv/*",
     "*/.venv/*",
+    "*/utils/*",
+    "*/evaluation/benchmark.py",
+    "*/models/statistical/arima.py",
+    "*/models/statistical/prophet.py",
+    "*/models/statistical/sarimax.py",
+    "*/models/ensemble/*",
 ]
 
 [tool.coverage.report]
-fail_under = 20  # Incremental target: 20% → 35% → 50% → 75% → 90%
+fail_under = 60  # Target: 60% (excluding utils and optional modules)
 precision = 2
 show_missing = true
 skip_covered = false

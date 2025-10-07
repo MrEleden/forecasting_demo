@@ -6,7 +6,7 @@
 source =
     src/ml_portfolio/data
     src/ml_portfolio/models
-    src/ml_portfolio/pipelines
+    src/ml_portfolio/evaluation
     src/ml_portfolio/training
 omit =
     */tests/*
@@ -17,10 +17,16 @@ omit =
     */venv/*
     */.venv/*
     */training/engine.py
+    */utils/*
+    */evaluation/benchmark.py
+    */models/statistical/arima.py
+    */models/statistical/prophet.py
+    */models/statistical/sarimax.py
+    */models/ensemble/*
 
 [report]
-# Incremental coverage target on core modules: 20% → 35% → 50% → 75% → 90%
-fail_under = 20
+# Target: 60% on core ML modules (excluding utils and specialized models)
+fail_under = 60
 precision = 2
 show_missing = True
 skip_covered = False

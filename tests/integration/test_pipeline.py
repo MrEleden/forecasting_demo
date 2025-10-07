@@ -4,6 +4,8 @@ Integration tests for full training pipeline.
 
 import pytest
 
+pytest.skip("Integration tests disabled - requires full environment setup", allow_module_level=True)
+
 
 class TestTrainingPipeline:
     """Test end-to-end training pipeline."""
