@@ -1,6 +1,6 @@
 # Core dependencies for ML Portfolio Forecasting Demo
-numpy>=2.3.3,<3.0.0
-pandas>=2.3.3,<3.0.0
+numpy>=1.26.4,<2.0.0
+pandas>=2.2.2,<2.3.0
 hydra-core>=1.3.0,<2.0.0
 omegaconf>=2.3.0,<3.0.0
 
