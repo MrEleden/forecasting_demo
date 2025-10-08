@@ -245,6 +245,54 @@ $$
 
 ______________________________________________________________________
 
+## Benchmarking utilities (`ml_portfolio.evaluation.benchmark`)
+
+Benchmarking tools compare multiple estimators on consistent datasets and metrics.
+
+- `BenchmarkResult`: dataclass capturing `model_name`, `dataset_name`, `mape`, `rmse`, `mae`, timing stats, sample counts, and optional parameter metadata. Use `to_dict()` to serialize a single run.
+- `ModelBenchmark(output_dir="results/benchmarks")`: manages experiment runs, result storage, and visualization helpers. The `output_dir` is created automatically if missing.
+
+### Core workflow
+
+```python
+from ml_portfolio.evaluation.benchmark import ModelBenchmark
+from ml_portfolio.models.statistical.lightgbm import LightGBMForecaster
+from ml_portfolio.models.statistical.catboost import CatBoostForecaster
+
+benchmark = ModelBenchmark(output_dir="outputs/walmart/benchmarks")
+
+results = benchmark.run_multiple_models(
+  models={
+    "lightgbm": LightGBMForecaster(),
+    "catboost": CatBoostForecaster(),
+  },
+  X_train=X_train,
+  y_train=y_train,
+  X_test=X_test,
+  y_test=y_test,
+  dataset_name="walmart_weekly_sales",
+)
+
+ranking = benchmark.get_ranking(metric="mape")
+benchmark.save_results()
+benchmark.plot_comparison(metric="mape")
+```
+
+### Utilities
+
+- `run_benchmark(...)`: Benchmark a single model; returns `BenchmarkResult` with metrics and timing. Internally prints timings and metrics for quick feedback.
+- `run_multiple_models(models, ...)`: Loops over a dict of name → estimator, aggregating successful runs.
+- `get_results_dataframe()` / `get_summary_statistics()`: Return pandas DataFrames for downstream analysis, including grouped statistics by model.
+- `get_ranking(metric="mape")`: Produces an ordered DataFrame of average metric scores.
+- `save_results(filename="benchmark_results.json")`: Writes JSON with metadata to `output_dir`.
+- `plot_comparison(metric)` / `plot_training_time_vs_accuracy(metric)`: Generate `matplotlib`/`seaborn` figures to visualise accuracy–speed trade-offs (set `save_fig=False` to skip disk writes).
+- `generate_report()`: Creates a comprehensive text summary and saves it alongside plots; returns the report string for display in notebooks or logs.
+- `load_benchmark_results(path)`: Convenience loader that recreates `BenchmarkResult` objects from a JSON export.
+
+> Optional plotting features require Matplotlib and Seaborn (installed via `requirements-ml.txt`).
+
+______________________________________________________________________
+
 ## Training engines (`ml_portfolio.training.engine`)
 
 Two main engines coordinate training loops:
@@ -298,110 +346,11 @@ ______________________________________________________________________
 
 ## Working with examples
 
-See `docs/tutorials/01_first_forecast.md` for an end-to-end walkthrough that combines factory splits, LightGBM training, and evaluation. The benchmark guide in `docs/BENCHMARK.md` covers multi-model comparison and artifact generation.
-
-# API Reference
-
-Complete API documentation for ML Forecasting Portfolio.
-
-## Core Modules
-
-### ml_portfolio.models
-
-Model implementations for time series forecasting.
-
-#### Statistical Models
-
-##### LightGBMForecaster
-
-```python
-from ml_portfolio.models.statistical.lightgbm import LightGBMForecaster
-
-model = LightGBMForecaster(
-    n_estimators=500,
-    learning_rate=0.05,
-    max_depth=8,
-    num_leaves=31
-)
-```
-
-**Parameters:**
-
-- `n_estimators` (int): Number of boosting rounds. Default: 100
-- `learning_rate` (float): Learning rate. Default: 0.1
-- `max_depth` (int): Maximum tree depth. Default: -1 (no limit)
-- `num_leaves` (int): Maximum number of leaves. Default: 31
-- `min_child_samples` (int): Minimum samples per leaf. Default: 20
-- `reg_alpha` (float): L1 regularization. Default: 0.0
-- `reg_lambda` (float): L2 regularization. Default: 0.0
-- `subsample` (float): Row sampling ratio. Default: 1.0
-- `colsample_bytree` (float): Column sampling ratio. Default: 1.0
-
-**Methods:**
-
-- `fit(X, y)`: Train the model
-- `predict(X)`: Make predictions
-- `get_feature_importance()`: Get feature importances
-
-##### XGBoostForecaster
-
-```python
-from ml_portfolio.models.statistical.xgboost import XGBoostForecaster
-
-model = XGBoostForecaster(
-    n_estimators=500,
-    learning_rate=0.05,
-    max_depth=8
-)
-```
-
-**Parameters:**
-
-- Similar to LightGBM with XGBoost-specific additions
-- `gamma` (float): Minimum loss reduction. Default: 0.0
-- `min_child_weight` (float): Minimum sum of instance weight. Default: 1.0
-
-##### CatBoostForecaster
-
-```python
-from ml_portfolio.models.statistical.catboost import CatBoostForecaster
-
-model = CatBoostForecaster(
-    iterations=500,
-    learning_rate=0.05,
-    depth=8
-)
-```
-
-**Parameters:**
-
-- `iterations` (int): Number of boosting iterations
-- `depth` (int): Tree depth. Default: 6
-- `l2_leaf_reg` (float): L2 regularization. Default: 3.0
-- `bagging_temperature` (float): Bagging temperature. Default: 1.0
-
-#### Deep Learning Models
-
-##### LSTMForecaster
-
-```python
-from ml_portfolio.models.deep_learning.lstm import LSTMForecaster
-
-model = LSTMForecaster(
-    input_size=42,
-    hidden_size=128,
-    num_layers=2,
-    dropout=0.2
-)
-```
-
-**Parameters:**
-
-- `input_size` (int): Number of input features
 - `hidden_size` (int): LSTM hidden size. Default: 128
 - `num_layers` (int): Number of LSTM layers. Default: 2
 - `dropout` (float): Dropout rate. Default: 0.2
 - `bidirectional` (bool): Use bidirectional LSTM. Default: False
+- See `examples/notebooks/phase2_phase3.ipynb` for an end-to-end walkthrough covering feature engineering, model training, benchmarking, and MLflow logging with the APIs above.
 
 **Methods:**
 

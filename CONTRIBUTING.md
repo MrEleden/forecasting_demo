@@ -33,6 +33,7 @@ Thank you for investing time in improving this portfolio. The project combines r
 - [ ] Linked or described the issue the PR addresses.
 - [ ] Added unit/integration tests when changing behaviour or fixing bugs.
 - [ ] Updated relevant documentation (tutorials, guides, benchmark docs, etc.).
+- [ ] Built documentation with `sphinx-build docs docs/_build/html` (ensure it finishes without errors).
 - [ ] Verified benchmark scripts or dashboards if changes affect them.
 - [ ] Confirmed `git status` shows no unintended file deletions.
 

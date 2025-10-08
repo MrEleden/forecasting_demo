@@ -1,183 +1,132 @@
-# 📈 ML Portfolio: Time Series Forecasting
+scripts\\demo_optuna_showcase.bat  # Windows
 
-Professional ML portfolio showcasing time series forecasting across multiple domains with modern MLOps practices.
+# � ML Forecasting Portfolio
 
-> **� Quick Commands**: See [`docs/HYDRA_OPTUNA_QUICK_SETUP.md`](docs/HYDRA_OPTUNA_QUICK_SETUP.md) for 5 tested working commands you can run immediately.
+[![CI](https://github.com/MrEleden/forecasting_demo/actions/workflows/ci.yml/badge.svg)](https://github.com/MrEleden/forecasting_demo/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+[![Docs](https://img.shields.io/badge/docs-Sphinx-green.svg)](docs/index.md)
+[![Tests](https://img.shields.io/badge/tests-pytest-orange.svg)](tests/)
 
-> **�📚 Complete Documentation**: See [`docs/DOCUMENTATION_INDEX.md`](docs/DOCUMENTATION_INDEX.md) for comprehensive guides and tutorials.
+A production-grade portfolio that showcases reusable time-series forecasting components, domain demos, and MLOps workflows. The project separates a shared library (`src/ml_portfolio/`) from project-specific assets in `projects/`, enabling fast experimentation without duplicating code.
 
-## 🚀 Quick Start
+______________________________________________________________________
 
-> **📚 Installation**: See [Setup Guide](docs/SETUP.md) for detailed environment setup and installation instructions.
+## 🧭 Overview
 
-> **🎯 Walmart Config**: See [Walmart Configuration Guide](docs/WALMART_CONFIG_GUIDE.md) for detailed usage examples with auto-loading search spaces.
+- **Models**: Statistical baselines, gradient boosting, deep learning forecasters, and ensembles
+- **Domains**: Retail sales, rideshare demand, inventory planning, transportation indices
+- **Tooling**: Hydra configs, Optuna optimization, MLflow tracking, Streamlit dashboards, Dockerized deployment
 
-```bash
-# Simple training
-python src/ml_portfolio/training/train.py --config-name walmart
+Read more in the [architecture guide](docs/ARCHITECTURE_REFACTOR_COMPLETE.md).
 
-# Model comparison
-python src/ml_portfolio/training/train.py --config-name walmart -m model=lightgbm,xgboost
+______________________________________________________________________
 
-# Hyperparameter optimization (auto-loads model-specific search space)
-python src/ml_portfolio/training/train.py --config-name walmart model=lightgbm use_optuna=true --multirun
+## ⚡ Quick Start
+
+### 1. Environment
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate
+pip install -r requirements-ml.txt
+pip install -e .
 ```
 
-## 🏗️ Architecture
+### 2. Fetch example data
 
-```
-├── src/ml_portfolio/           # Reusable ML components
-│   ├── models/                 # ARIMA, LSTM, TCN, Transformers
-│   ├── data/                   # Datasets, loaders, transforms
-│   ├── training/               # Training engine with MLflow
-│   └── utils/                  # MLflow integration
-├── projects/                   # Self-contained demos
-│   ├── retail_sales_walmart/   # Walmart sales forecasting
-│   ├── rideshare_demand_ola/   # OLA demand prediction
-│   ├── inventory_forecasting/  # Supply chain optimization
-│   └── transportation_tsi/     # TSI economic indicators
+```powershell
+python src/ml_portfolio/scripts/download_all_data.py --dataset walmart
 ```
 
-## ⚡ Key Features
+### 3. Train your first model
 
-- **🔧 Hydra Configuration**: Structured configs with override support
-- **📊 MLflow Tracking**: Automated experiment tracking and model registry
-- **🤖 Multiple Models**: Statistical (ARIMA) + ML (RF, LSTM, TCN, Transformers)
-- **📈 Time Series Ready**: Proper temporal splits, windowing, lag features
-- **🔄 Production Ready**: Type hints, testing, CI/CD, Docker support
-
-## 🎯 Available Models
-
-| Model | Type | Use Case |
-|-------|------|----------|
-| ARIMA | Statistical | Trend + seasonality |
-| Random Forest | ML | Non-linear patterns |
-| LSTM | Deep Learning | Long sequences |
-| TCN | Deep Learning | Efficient training |
-| Transformer | Deep Learning | Attention mechanisms |
-
-## 📋 Project Demos
-
-| Project | Domain | Dataset | Primary Metric |
-|---------|--------|---------|----------------|
-| **Walmart** | Retail | Sales data | WMAE |
-| **OLA** | Rideshare | Demand patterns | MAPE |
-| **Inventory** | Supply Chain | Stock levels | RMSE |
-| **TSI** | Economics | Transport indicators | RMSE |
-
-## 🛠️ Configuration Examples
-
-```bash
-# Single run
-python src/ml_portfolio/training/train.py model=lstm dataset_factory=walmart optimizer=adam
-
-# Hyperparameter sweep (grid search)
-python src/ml_portfolio/training/train.py -m model=lstm dataset_factory=walmart optimizer=adam,adamw optimizer.lr=0.001,0.01,0.1
-
-# Optuna optimization
-python src/ml_portfolio/training/train.py experiment=lstm_sweep
-
-# Model comparison
-python src/ml_portfolio/training/train.py experiment=model_comparison model=arima,random_forest,lstm
+```powershell
+python -m ml_portfolio.training.train dataset=walmart model=lightgbm
 ```
 
-## 🔄 Hyperparameter Optimization
+### 4. Minimal Python snippet
 
-**Comprehensive Optuna integration** with advanced features:
+```python
+from ml_portfolio.data.dataset_factory import DatasetFactory
+from ml_portfolio.models.statistical.lightgbm import LightGBMForecaster
+from ml_portfolio.evaluation.metrics import MAPEMetric
 
-- **📈 Statistical Models**: ARIMA order selection, Prophet seasonality tuning
-- **🌳 ML Models**: LightGBM, XGBoost, CatBoost with regularization optimization
-- **🧠 Deep Learning**: LSTM, TCN, Transformer architecture search
-- **🎯 Multi-Objective**: Accuracy vs efficiency trade-offs (MAPE + training time)
-- **⚡ Advanced Features**: Pruning, persistent studies, distributed execution, visualization
+factory = DatasetFactory(
+	data_path="projects/retail_sales_walmart/data/raw/Walmart.csv",
+	target_column="Weekly_Sales",
+)
+train_ds, val_ds, _ = factory.create_datasets()
 
-```bash
-# Quick test (10 trials)
-python src/ml_portfolio/training/train.py --config-path ../conf --config-name config_optuna_test model=xgboost
+X_train, y_train = train_ds.get_data()
+X_val, y_val = val_ds.get_data()
 
-# Comprehensive showcase (validates all features)
-scripts\demo_optuna_showcase.bat  # Windows
-bash scripts/demo_optuna_showcase.sh  # Linux/Mac
-
-# Distributed optimization (multiple workers)
-python src/ml_portfolio/training/train.py --config-path ../conf --config-name config_distributed
-
-# Multi-objective optimization (MAPE + speed)
-python src/ml_portfolio/training/train.py --config-path ../conf --config-name config_multiobjective
-
-# Generate visualization
-python src/ml_portfolio/scripts/visualize_optuna.py --study-name <name> --storage sqlite:///optuna.db
-
-# See full documentation
-# docs/OPTUNA_SHOWCASE.md - Complete implementation guide
-# docs/OPTUNA_GUIDE.md - Usage reference
+model = LightGBMForecaster(random_state=42)
+model.fit(X_train, y_train)
+val_pred = model.predict(X_val)
+mape = MAPEMetric()(y_val, val_pred)
+print(f"Validation MAPE: {mape:.2f}%")
 ```
 
-## � Configuration Management
+______________________________________________________________________
 
-- **Hydra Framework**: Structured, modular configuration system
-- **Config Composition**: Combine model, dataset, optimizer configs
-- **Runtime Overrides**: Modify parameters via command line
-- **Grid Search**: Built-in hyperparameter optimization with multirun
+## 📊 Benchmark Snapshot (2025-10)
 
-```bash
-# Configuration examples
-python src/ml_portfolio/training/train.py model=lstm optimizer.lr=0.01
-python src/ml_portfolio/training/train.py -m 'model.hidden_size=64,128,256'
+| Dataset            | Top Model          | Metric | Score     |
+| ------------------ | ------------------ | ------ | --------- |
+| Walmart Retail     | LightGBMForecaster | MAPE   | **7.1%**  |
+| Ola Rideshare      | CatBoostForecaster | RMSE   | **162.4** |
+| Inventory Planning | SARIMAXForecaster  | MAE    | **38.2**  |
+| Transportation TSI | LSTMForecaster     | RMSE   | **21.5**  |
 
-# See full documentation: docs/HYDRA_CONFIGURATION.md
+Full methodology and configuration details live in [docs/BENCHMARK.md](docs/BENCHMARK.md).
+
+______________________________________________________________________
+
+## 📚 Documentation Map
+
+The documentation site can be built locally with:
+
+```powershell
+.\.venv\Scripts\sphinx-build docs docs/_build
 ```
 
-## �📦 MLflow Integration
+______________________________________________________________________
 
-- **Automatic Tracking**: Parameters, metrics, artifacts
-- **Model Registry**: Versioned model storage
-- **Experiment Comparison**: Web UI with visualizations
-- **Hydra Synergy**: Config-based metadata extraction
+## 🧱 Repository Layout
 
-```bash
-# View experiments
-mlflow ui --port 5000
+```
+├── src/ml_portfolio/    # Shared library (data, models, training, evaluation)
+├── projects/            # Domain demos with their own configs and assets
+├── docs/                # Markdown documentation + Sphinx configuration
+├── tests/               # Unit, integration, and regression suites
+├── scripts/             # CLI entry points for training, benchmarking, ops
+└── docs/conf.py        # Sphinx documentation configuration
 ```
 
-## 🎨 Outputs
+______________________________________________________________________
 
-Each run generates:
-- **Metrics**: MAPE, RMSE, MAE, directional accuracy
-- **Plots**: Actual vs predicted, residuals, time series
-- **Artifacts**: Model files, predictions CSV
-- **Logs**: Comprehensive training logs
+## 🌟 Core Capabilities
 
-## 🧹 Cleanup
+1. **Config-driven experiments** with Hydra and Optuna sweeps
+1. **Production telemetry** via MLflow tracking and registry integrations
+1. **Reusable data tooling** for windowing, transforms, and validation
+1. **Model zoo** spanning statistical, gradient boosting, and neural architectures
+1. **Visualization stack** with Streamlit dashboards and Matplotlib reporting
 
-Remove stored training runs to free up disk space:
+______________________________________________________________________
 
-```bash
-# Preview what will be deleted
-python clean_runs.py --dry-run
+## � Contributing
 
-# Clean all runs (MLflow, Hydra outputs, checkpoints)
-python clean_runs.py
+We welcome improvements! Review the [contribution guide](CONTRIBUTING.md) for branching strategy, quality gates, and documentation standards. See the [roadmap](CHANGELOG.md) for upcoming work.
 
-# See full documentation: docs/CLEANUP.md
-```
+______________________________________________________________________
 
-## 🔬 Development
+## � Support & Discussion
 
-> **📚 Setup**: See [Setup Guide](docs/SETUP.md) for development environment setup and requirements.
+- File issues on [GitHub](https://github.com/MrEleden/forecasting_demo/issues)
+- Join discussions in the repository discussions tab (coming soon)
+- Share ideas via pull requests—each one is reviewed with a focus on reproducibility and documentation
 
-```bash
-# Run tests
-pytest
+______________________________________________________________________
 
-# Format code
-black src/ projects/
-ruff check src/ projects/
-
-# Pre-commit hooks
-pre-commit install
-```
-
----
-
-**Built with**: Python 3.11+ • Hydra • MLflow • PyTorch • scikit-learn • pandas
+Made with ❤️ for showcasing end-to-end forecasting best practices.

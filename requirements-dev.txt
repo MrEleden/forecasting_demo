@@ -18,3 +18,4 @@ pre-commit>=3.0.0
 # Documentation
 sphinx>=7.0.0
 myst-parser>=2.0.0
+linkify-it-py>=2.0.0
