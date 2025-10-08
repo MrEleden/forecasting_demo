@@ -22,7 +22,6 @@ omit =
     */models/statistical/arima.py
     */models/statistical/prophet.py
     */models/statistical/sarimax.py
-    */models/ensemble/*
 
 [report]
 # Current baseline: 36.23% for core ML modules (data, models, pipelines, training - excluding engine.py)
@@ -39,7 +38,7 @@ exclude_lines =
     def __str__
     raise AssertionError
     raise NotImplementedError
-    if __name__ == .__main__.:
+    if __name__ == "__main__":
     if TYPE_CHECKING:
     @abstractmethod
     @abc.abstractmethod

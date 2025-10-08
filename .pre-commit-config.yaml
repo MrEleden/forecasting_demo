@@ -40,6 +40,15 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
 
+  # Markdown formatter (keeps front matter + tables consistent)
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.17
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-frontmatter
+
   # pytest with coverage - Optional coverage reporting (not enforced)
   # Focus on core implementation: data, models, pipelines, training
   # Note: engine.py is excluded from coverage (complex PyTorch training loops)
