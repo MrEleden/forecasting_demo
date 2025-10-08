@@ -7,6 +7,12 @@ jupyter>=1.0.0
 ipykernel>=6.25.0
 notebook>=7.0.0
 
+# Optional ML libraries required for unit test coverage
+lightgbm>=4.0.0
+xgboost>=1.7.0
+catboost>=1.2.0
+scipy>=1.11.0
+
 # Code quality
 black>=23.0.0
 ruff>=0.1.0
