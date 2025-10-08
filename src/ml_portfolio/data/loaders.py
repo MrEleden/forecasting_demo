@@ -11,7 +11,7 @@ Architecture:
 """
 
 from abc import ABC, abstractmethod
-from typing import Iterator, Optional, Tuple
+from typing import Any, Iterator, Optional, Tuple
 
 import numpy as np
 
@@ -24,6 +24,7 @@ try:
 
     TORCH_AVAILABLE = True
 except ImportError:
+    torch = None
     TORCH_AVAILABLE = False
     TorchDataLoader = object  # Fallback for class inheritance
 
@@ -59,12 +60,12 @@ class BaseDataLoader(ABC):
         self.kwargs = kwargs
 
     @abstractmethod
-    def __iter__(self) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+    def __iter__(self) -> Iterator[Tuple[Any, Any]]:
         """
         Iterate over batches.
 
         Yields:
-            Tuple of (X_batch, y_batch) as numpy arrays
+            Tuple of (X_batch, y_batch) as numpy arrays or torch tensors
         """
         pass
 
@@ -159,7 +160,7 @@ class SimpleDataLoader(BaseDataLoader):
         return 1
 
 
-class PyTorchDataLoader(TorchDataLoader):
+class PyTorchDataLoader(TorchDataLoader, BaseDataLoader):
     """
     PyTorch DataLoader that inherits from torch.utils.data.DataLoader.
 
@@ -169,14 +170,14 @@ class PyTorchDataLoader(TorchDataLoader):
     - Advanced sampling strategies
     - Efficient mini-batch iteration
 
-    The key difference from standard PyTorch DataLoader is that __iter__
-    automatically converts tensors to numpy arrays for compatibility with
-    the BaseDataLoader interface.
+    By default this loader yields native torch tensors so deep learning
+    models can train efficiently. Set ``return_numpy=True`` when
+    instantiating to force conversion back to NumPy for hybrid workflows.
 
     Usage:
         loader = PyTorchDataLoader(dataset, batch_size=64, num_workers=4)
         for X_batch, y_batch in loader:
-            # X_batch and y_batch are numpy arrays (converted from tensors)
+            # X_batch and y_batch are torch tensors by default
             model.fit(X_batch, y_batch)
 
     Hydra Config:
@@ -196,6 +197,7 @@ class PyTorchDataLoader(TorchDataLoader):
         num_workers: int = 0,
         pin_memory: bool = False,
         drop_last: bool = False,
+        return_numpy: bool = False,
         **kwargs,
     ):
         """
@@ -208,6 +210,7 @@ class PyTorchDataLoader(TorchDataLoader):
             num_workers: Number of worker processes for data loading
             pin_memory: Whether to pin memory for faster GPU transfer
             drop_last: Whether to drop the last incomplete batch
+            return_numpy: If True, convert batches to numpy arrays when iterating
             **kwargs: Additional PyTorch DataLoader parameters
         """
         if not TORCH_AVAILABLE:
@@ -217,8 +220,11 @@ class PyTorchDataLoader(TorchDataLoader):
                 "Or use SimpleDataLoader instead."
             )
 
+        BaseDataLoader.__init__(self, dataset, batch_size=batch_size, shuffle=shuffle, **kwargs)
+
         # Initialize PyTorch DataLoader parent class
-        super().__init__(
+        TorchDataLoader.__init__(
+            self,
             dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -228,20 +234,23 @@ class PyTorchDataLoader(TorchDataLoader):
             **kwargs,
         )
 
-    def __iter__(self) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+        self.return_numpy = return_numpy
+
+    def __iter__(self) -> Iterator[Tuple[Any, Any]]:
         """
         Iterate over batches from PyTorch DataLoader.
 
-        Overrides parent __iter__ to convert tensors to numpy arrays.
+        By default this yields native torch tensors. Set ``return_numpy=True``
+        to obtain NumPy batches for compatibility with sklearn-style models.
 
         Yields:
-            Tuple of (X_batch, y_batch) as numpy arrays
+            Tuple of (X_batch, y_batch) as torch tensors or numpy arrays
         """
-        for X_batch, y_batch in super().__iter__():
-            # Convert tensors to numpy
-            if hasattr(X_batch, "numpy"):
-                X_batch = X_batch.numpy()
-            if hasattr(y_batch, "numpy"):
-                y_batch = y_batch.numpy()
+        for X_batch, y_batch in TorchDataLoader.__iter__(self):
+            if self.return_numpy:
+                if TORCH_AVAILABLE and isinstance(X_batch, torch.Tensor):
+                    X_batch = X_batch.detach().cpu().numpy()
+                if TORCH_AVAILABLE and isinstance(y_batch, torch.Tensor):
+                    y_batch = y_batch.detach().cpu().numpy()
 
             yield X_batch, y_batch

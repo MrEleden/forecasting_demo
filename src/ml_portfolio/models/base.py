@@ -6,7 +6,7 @@ This module defines the minimal abstract base classes that all forecasting model
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -193,12 +193,18 @@ class PyTorchForecaster(BaseForecaster):
         train_loader,
         val_loader=None,
         epochs: int = 100,
-        learning_rate: float = 0.001,
+        learning_rate: float = None,
         verbose: bool = True,
+        grad_clip: float = None,
+        val_interval: int = 1,
         **kwargs,
     ):
         """
         Fit PyTorch model with multi-epoch training.
+
+        Subclasses typically only need to implement ``forward`` and optionally override
+        helper hooks (``_prepare_batch``, ``_training_step``, ``_validation_step``,
+        ``_get_loss_fn``, ``_get_optimizer``).
 
         Args:
             train_loader: Training data loader
@@ -206,14 +212,68 @@ class PyTorchForecaster(BaseForecaster):
             epochs: Number of training epochs
             learning_rate: Learning rate for optimizer
             verbose: Whether to print training progress
-            **kwargs: Additional training parameters
+            grad_clip: Gradient clipping value (L2 norm). Disabled when ``None``.
+            val_interval: Validate every N epochs (defaults to every epoch)
+            **kwargs: Additional training parameters for subclasses
         """
-        # This method should be overridden by subclasses
-        # but provides a template for PyTorch training
-        raise NotImplementedError("Subclasses must implement fit() method")
+        if not TORCH_AVAILABLE:
+            raise ImportError("PyTorch is required for PyTorchForecaster. Install with: pip install torch")
+
+        if train_loader is None:
+            raise ValueError("train_loader must be provided for PyTorch models")
+
+        if learning_rate is None:
+            learning_rate = getattr(self, "learning_rate", 0.001)
+
+        if grad_clip is None:
+            grad_clip = getattr(self, "default_grad_clip", None)
+
+        self.train()
+
+        criterion = self._get_loss_fn()
+        optimizer = self._get_optimizer(learning_rate)
+        scheduler = self._get_scheduler(optimizer)
+
+        log_interval = kwargs.get("log_interval", 10)
+
+        for epoch in range(epochs):
+            epoch_loss = 0.0
+            n_batches = 0
+
+            for batch_X, batch_y in train_loader:
+                inputs, targets = self._prepare_batch(batch_X, batch_y, training=True)
+
+                optimizer.zero_grad()
+                loss, _ = self._training_step(inputs, targets, criterion)
+
+                loss.backward()
+                if grad_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(self.parameters(), grad_clip)
+                optimizer.step()
+
+                epoch_loss += loss.item()
+                n_batches += 1
+
+            avg_train_loss = epoch_loss / max(n_batches, 1)
+
+            if scheduler is not None:
+                scheduler.step()
+
+            if verbose and (epoch + 1) % max(log_interval, 1) == 0:
+                print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {avg_train_loss:.4f}")
+
+            if val_loader is not None and (epoch + 1) % max(val_interval, 1) == 0:
+                val_loss = self._run_validation(val_loader, criterion)
+                if verbose:
+                    print(
+                        f"Epoch [{epoch + 1}/{epochs}], Train Loss: {avg_train_loss:.4f}, " f"Val Loss: {val_loss:.4f}"
+                    )
+
+        self.is_fitted = True
+        return self
 
     @abstractmethod
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         """
         Define the forward pass of the PyTorch model.
 
@@ -237,6 +297,82 @@ class PyTorchForecaster(BaseForecaster):
         """
         # This should be overridden by subclasses with proper shape handling
         raise NotImplementedError("Subclasses must implement predict() method")
+
+    def _get_loss_fn(self) -> Any:
+        """Return loss function used during training."""
+
+        return nn.MSELoss()
+
+    def _get_optimizer(self, learning_rate: float) -> Any:
+        """Instantiate optimizer for training."""
+
+        return torch.optim.Adam(self.parameters(), lr=learning_rate)
+
+    def _get_scheduler(self, optimizer: Any):
+        """Optional learning-rate scheduler hook (default: None)."""
+
+        return None
+
+    def _prepare_batch(self, X: Any, y: Any, training: bool = True) -> Tuple[Any, Any]:
+        """Move batch to device and ensure tensor format."""
+
+        return self._to_tensor(X), self._to_tensor(y)
+
+    def _training_step(
+        self,
+        inputs: Any,
+        targets: Any,
+        criterion: Any,
+    ) -> Tuple[Any, Any]:
+        """Perform forward pass and compute loss for a single batch."""
+
+        outputs = self.forward(inputs)
+        loss = criterion(outputs, targets)
+        return loss, outputs
+
+    def _validation_step(
+        self,
+        inputs: Any,
+        targets: Any,
+        criterion: Any,
+    ) -> Any:
+        """Compute validation loss for a single batch."""
+
+        outputs = self.forward(inputs)
+        loss = criterion(outputs, targets)
+        return loss
+
+    def _run_validation(self, loader, criterion: Any) -> float:
+        """Evaluate validation loss over an entire loader."""
+
+        self.eval()
+        total_loss = 0.0
+        n_batches = 0
+
+        with torch.no_grad():
+            for batch_X, batch_y in loader:
+                inputs, targets = self._prepare_batch(batch_X, batch_y, training=False)
+                loss = self._validation_step(inputs, targets, criterion)
+                total_loss += loss.item()
+                n_batches += 1
+
+        self.train()
+        return total_loss / max(n_batches, 1)
+
+    def _to_tensor(self, data: Any) -> Any:
+        """Convert numpy/pandas/array-like data to float tensor on device."""
+
+        if isinstance(data, torch.Tensor):
+            return data.to(self.device, dtype=torch.float32)
+
+        if isinstance(data, (pd.DataFrame, pd.Series)):
+            array = data.values
+        elif isinstance(data, np.ndarray):
+            array = data
+        else:
+            array = np.asarray(data)
+
+        return torch.as_tensor(array, dtype=torch.float32, device=self.device)
 
     def _compute_metrics(self, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
         """

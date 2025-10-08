@@ -28,6 +28,17 @@ import shutil
 from pathlib import Path
 
 
+def find_repo_root(start: Path) -> Path:
+    """Walk upwards from ``start`` until we find the project root."""
+
+    current = start if start.is_dir() else start.parent
+
+    for candidate in [current, *current.parents]:
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+    return current
+
+
 def get_dir_size(path: Path) -> int:
     """Calculate total size of directory in bytes."""
     total = 0
@@ -141,8 +152,8 @@ def main():
 
     args = parser.parse_args()
 
-    # Get repository root
-    repo_root = Path(__file__).parent
+    # Get repository root (walk up to the directory containing pyproject.toml)
+    repo_root = find_repo_root(Path(__file__).resolve())
 
     # Define directories to clean
     mlflow_dir = repo_root / "mlruns"

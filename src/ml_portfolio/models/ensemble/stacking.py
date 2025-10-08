@@ -4,13 +4,18 @@ Stacking Ensemble for time series forecasting.
 Combines multiple base models with a meta-learner.
 """
 
-from typing import Any, Dict, List, Optional
+import logging
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge
 
+from ...data.datasets import TimeSeriesDataset
+from ...data.loaders import SimpleDataLoader
 from ..base import StatisticalForecaster
+
+logger = logging.getLogger(__name__)
 
 
 class StackingForecaster(StatisticalForecaster):
@@ -47,7 +52,7 @@ class StackingForecaster(StatisticalForecaster):
 
     def __init__(
         self,
-        base_models: List[tuple],
+        base_models: List[Tuple[str, Any]],
         meta_model: Optional[Any] = None,
         use_features: bool = False,
         cv_folds: int = 5,
@@ -64,48 +69,40 @@ class StackingForecaster(StatisticalForecaster):
         # Will be set during fit
         self.fitted_base_models_ = []
         self.feature_names_ = None
+        self.n_features_ = None
 
-    def fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
-        """
-        Fit stacking ensemble.
+    def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs):
+        """Internal fit implementation called by StatisticalForecaster."""
 
-        Args:
-            X: Features dataframe
-            y: Target values
-            **kwargs: Additional fitting parameters
+        X_df = self._ensure_dataframe(X, fit=True)
+        y_array = self._ensure_array(y)
 
-        Returns:
-            self: Fitted model
-        """
-        self.feature_names_ = list(X.columns)
+        dataset = TimeSeriesDataset(X_df.values, y_array, feature_names=self.feature_names_)
+        loader = SimpleDataLoader(dataset, shuffle=False)
 
-        # Train base models and collect predictions
         base_predictions = []
         self.fitted_base_models_ = []
 
         for name, model in self.base_models:
-            print(f"Training base model: {name}")
-
-            # Fit model
-            model.fit(X, y)
+            logger.info(f"Training base model: {name}")
+            model.fit(train_loader=loader)
             self.fitted_base_models_.append((name, model))
 
-            # Get out-of-fold predictions for meta-learner
-            # Simple approach: use same data (can improve with CV)
-            preds = model.predict(X)
+            preds = np.asarray(model.predict(X_df.values)).reshape(-1, 1)
             base_predictions.append(preds)
 
-        # Stack base predictions
-        meta_features = np.column_stack(base_predictions)
+        if not base_predictions:
+            raise ValueError("No base models were provided to the stacking ensemble")
 
-        # Optionally include original features
+        meta_features = np.hstack(base_predictions)
+
         if self.use_features:
-            meta_features = np.hstack([meta_features, X.values])
+            meta_features = np.hstack([meta_features, X_df.values])
 
-        # Train meta-learner
-        print("Training meta-learner")
-        self.meta_model.fit(meta_features, y)
+        logger.info("Training meta-learner")
+        self.meta_model.fit(meta_features, y_array)
 
+        self.is_fitted = True
         return self
 
     def predict(self, X: pd.DataFrame, **kwargs) -> np.ndarray:
@@ -122,18 +119,20 @@ class StackingForecaster(StatisticalForecaster):
         if not self.fitted_base_models_:
             raise ValueError("Model must be fit before making predictions")
 
+        X_df = self._ensure_dataframe(X, fit=False)
+
         # Get predictions from base models
         base_predictions = []
         for name, model in self.fitted_base_models_:
-            preds = model.predict(X)
+            preds = np.asarray(model.predict(X_df.values)).reshape(-1, 1)
             base_predictions.append(preds)
 
         # Stack predictions
-        meta_features = np.column_stack(base_predictions)
+        meta_features = np.hstack(base_predictions)
 
         # Include original features if specified
         if self.use_features:
-            meta_features = np.hstack([meta_features, X.values])
+            meta_features = np.hstack([meta_features, X_df.values])
 
         # Meta-learner prediction
         predictions = self.meta_model.predict(meta_features)
@@ -165,3 +164,45 @@ class StackingForecaster(StatisticalForecaster):
             "use_features": self.use_features,
         }
         return info
+
+    def _ensure_dataframe(self, X: Any, fit: bool) -> pd.DataFrame:
+        """Ensure input is a DataFrame and track feature names."""
+
+        if isinstance(X, pd.DataFrame):
+            df = X.copy()
+        else:
+            X = np.asarray(X)
+            if X.ndim == 1:
+                X = X.reshape(-1, 1)
+
+            if fit or self.feature_names_ is None:
+                self.feature_names_ = [f"feature_{i}" for i in range(X.shape[1])]
+            df = pd.DataFrame(X, columns=self.feature_names_)
+
+        if fit:
+            self.feature_names_ = df.columns.tolist()
+            self.n_features_ = df.shape[1]
+        else:
+            if self.feature_names_ is not None and list(df.columns) != list(self.feature_names_):
+                # Reorder or regenerate columns to match training layout
+                if df.shape[1] != self.n_features_:
+                    raise ValueError("Input feature dimension does not match training data")
+                df.columns = self.feature_names_
+
+        return df
+
+    @staticmethod
+    def _ensure_array(y: Any) -> np.ndarray:
+        """Convert target to 1D numpy array."""
+
+        if isinstance(y, pd.DataFrame):
+            y = y.values.ravel()
+        elif isinstance(y, pd.Series):
+            y = y.values
+        else:
+            y = np.asarray(y)
+
+        if y.ndim > 1:
+            y = y.ravel()
+
+        return y

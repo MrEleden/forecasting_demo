@@ -6,7 +6,7 @@ Excellent for complex temporal patterns and multivariate series.
 """
 
 import math
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -93,6 +93,7 @@ class TransformerForecaster(PyTorchForecaster, nn.Module):
         self.dim_feedforward = dim_feedforward
         self.dropout_rate = dropout
         self.learning_rate = learning_rate
+        self.default_grad_clip = 0.5
 
         # Store any additional kwargs for later use
         self.kwargs = kwargs
@@ -131,14 +132,7 @@ class TransformerForecaster(PyTorchForecaster, nn.Module):
         self.transformer.to(self.device)
         self.fc_out.to(self.device)
 
-        # Optimizer and loss
-        params = (
-            list(self.input_embedding.parameters())
-            + list(self.transformer.parameters())
-            + list(self.fc_out.parameters())
-        )
-        self.optimizer = torch.optim.Adam(params, lr=self.learning_rate)
-        self.criterion = nn.MSELoss()
+        # Default optimizer/loss will be created during training via base class hooks
 
     def _generate_square_subsequent_mask(self, sz: int):
         """Generate causal mask for decoder."""
@@ -172,123 +166,107 @@ class TransformerForecaster(PyTorchForecaster, nn.Module):
 
         return output
 
-    def fit(
-        self,
-        train_loader,
-        val_loader=None,
-        epochs: int = 100,
-        learning_rate: float = 0.001,
-        verbose: bool = True,
-        **kwargs,
-    ) -> "TransformerForecaster":
-        """Fit the Transformer model using dataloaders."""
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
-
-        self.train()
-        for epoch in range(epochs):
-            epoch_loss = 0.0
-            n_batches = 0
-
-            # Iterate over training dataloader
-            for batch_X, batch_y in train_loader:
-                # Convert to tensors if needed
-                if isinstance(batch_X, np.ndarray):
-                    batch_X = torch.FloatTensor(batch_X).to(self.device)
-                if isinstance(batch_y, np.ndarray):
-                    batch_y = torch.FloatTensor(batch_y).to(self.device)
-
-                # Ensure correct shapes
-                if len(batch_X.shape) == 2:
-                    batch_X = batch_X.unsqueeze(1)
-                if len(batch_y.shape) == 1:
-                    batch_y = batch_y.unsqueeze(1)
-
-                # For simplicity, use same input for src and tgt
-                outputs = self.forward(batch_X, batch_X)
-
-                # Take last timestep prediction
-                if len(outputs.shape) == 3:
-                    outputs = outputs[-1]  # (batch, output_size)
-
-                loss = criterion(outputs, batch_y)
-
-                optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.parameters(), 0.5)
-                optimizer.step()
-
-                epoch_loss += loss.item()
-                n_batches += 1
-
-            avg_train_loss = epoch_loss / n_batches
-
-            # Validation
-            if val_loader is not None and (epoch + 1) % 10 == 0:
-                self.eval()
-                val_loss = 0.0
-                val_batches = 0
-
-                with torch.no_grad():
-                    for batch_X, batch_y in val_loader:
-                        if isinstance(batch_X, np.ndarray):
-                            batch_X = torch.FloatTensor(batch_X).to(self.device)
-                        if isinstance(batch_y, np.ndarray):
-                            batch_y = torch.FloatTensor(batch_y).to(self.device)
-
-                        if len(batch_X.shape) == 2:
-                            batch_X = batch_X.unsqueeze(1)
-                        if len(batch_y.shape) == 1:
-                            batch_y = batch_y.unsqueeze(1)
-
-                        val_outputs = self.forward(batch_X, batch_X)
-                        if len(val_outputs.shape) == 3:
-                            val_outputs = val_outputs[-1]
-
-                        val_loss += criterion(val_outputs, batch_y).item()
-                        val_batches += 1
-
-                avg_val_loss = val_loss / val_batches if val_batches > 0 else 0
-                self.train()
-
-                if verbose:
-                    print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
-            elif verbose and (epoch + 1) % 10 == 0:
-                print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}")
-
-        self.is_fitted = True
-        return self
-
-    def predict(self, X: pd.DataFrame, **kwargs) -> np.ndarray:
+    def predict(self, X: Any, **kwargs) -> np.ndarray:
         """
         Make predictions.
 
         Args:
-            X: Features dataframe
+            X: Features as DataFrame, numpy array, or tensor-like
             **kwargs: Additional prediction parameters
 
         Returns:
             predictions: Predicted values
         """
-        self.input_embedding.eval()
-        self.transformer.eval()
-        self.fc_out.eval()
+        self.eval()
 
         with torch.no_grad():
-            X_tensor = torch.FloatTensor(X.values).to(self.device)
-
-            # Reshape if needed
-            if len(X_tensor.shape) == 2:
-                X_tensor = X_tensor.unsqueeze(1)
+            X_tensor = self._prepare_inputs(X)
 
             outputs = self.forward(X_tensor, X_tensor)
-            predictions = outputs[-1].cpu().numpy().squeeze()
+            predictions = outputs[-1].detach().cpu().numpy()
+
+        if predictions.ndim == 2 and predictions.shape[1] == 1:
+            predictions = predictions[:, 0]
+        elif predictions.ndim == 0:
+            predictions = np.array([predictions])
 
         return predictions
 
+    def _prepare_batch(self, X: Any, y: Any, training: bool = True):
+        """Convert batches to seq-first tensors for transformer."""
+
+        inputs = self._prepare_inputs(X)
+        batch_size = inputs.shape[1]
+        targets = self._prepare_targets(y, expected_batch=batch_size)
+        return inputs, targets
+
+    def _training_step(self, inputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module):
+        """Custom training step using transformer decoder structure."""
+
+        outputs = self.forward(inputs, inputs)
+        predictions = outputs[-1]
+        loss = criterion(predictions, targets)
+        return loss, predictions
+
+    def _validation_step(self, inputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module):
+        """Validation step mirroring the training computation."""
+
+        outputs = self.forward(inputs, inputs)
+        predictions = outputs[-1]
+        return criterion(predictions, targets)
+
+    def _to_device_tensor(self, data: Any, dtype: torch.dtype = torch.float32) -> torch.Tensor:
+        """Convert arbitrary input to a tensor on the configured device."""
+
+        if isinstance(data, torch.Tensor):
+            return data.to(self.device, dtype=dtype)
+
+        if isinstance(data, (pd.DataFrame, pd.Series)):
+            array = data.values
+        elif isinstance(data, np.ndarray):
+            array = data
+        else:
+            array = np.asarray(data)
+
+        return torch.as_tensor(array, dtype=dtype, device=self.device)
+
+    def _prepare_inputs(self, X: Any) -> torch.Tensor:
+        """Ensure inputs have shape (seq_len, batch, features)."""
+
+        tensor = self._to_device_tensor(X)
+
+        if tensor.dim() == 1:
+            tensor = tensor.view(1, 1, -1)
+        elif tensor.dim() == 2:
+            tensor = tensor.unsqueeze(0)
+        elif tensor.dim() == 3:
+            # assume batch-first (batch, seq, features)
+            tensor = tensor.permute(1, 0, 2).contiguous()
+        else:
+            raise ValueError(f"Unsupported input shape for Transformer: {tensor.shape}")
+
+        return tensor
+
+    def _prepare_targets(self, y: Any, expected_batch: Optional[int] = None) -> torch.Tensor:
+        """Ensure targets have shape (batch, output_size)."""
+
+        tensor = self._to_device_tensor(y)
+
+        if tensor.dim() == 0:
+            tensor = tensor.view(1, 1)
+        elif tensor.dim() == 1:
+            tensor = tensor.view(-1, 1)
+        else:
+            tensor = tensor.reshape(tensor.shape[0], -1)
+
+        if expected_batch is not None and tensor.shape[0] != expected_batch:
+            tensor = tensor.reshape(expected_batch, -1)
+
+        return tensor
+
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
         """Get model parameters."""
-        return {
+        params = {
             "input_size": self.input_size,
             "output_size": self.output_size,
             "d_model": self.d_model,
@@ -298,10 +276,15 @@ class TransformerForecaster(PyTorchForecaster, nn.Module):
             "dim_feedforward": self.dim_feedforward,
             "dropout": self.dropout_rate,
             "learning_rate": self.learning_rate,
-            "batch_size": self.batch_size,
-            "num_epochs": self.num_epochs,
             **self.kwargs,
         }
+
+        if hasattr(self, "batch_size"):
+            params["batch_size"] = self.batch_size
+        if hasattr(self, "num_epochs"):
+            params["num_epochs"] = self.num_epochs
+
+        return params
 
     def set_params(self, **params) -> "TransformerForecaster":
         """Set model parameters."""

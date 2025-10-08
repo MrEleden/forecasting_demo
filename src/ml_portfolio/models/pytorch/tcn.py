@@ -5,7 +5,7 @@ TCN uses dilated causal convolutions for efficient long-sequence modeling.
 Excellent for capturing temporal dependencies with parallel computation.
 """
 
-from typing import List
+from typing import Any, List
 
 import numpy as np
 import pandas as pd
@@ -188,102 +188,71 @@ class TCNForecaster(PyTorchForecaster, nn.Module):
 
         return out
 
-    def fit(
-        self,
-        train_loader,
-        val_loader=None,
-        epochs: int = 100,
-        learning_rate: float = 0.001,
-        verbose: bool = True,
-        **kwargs,
-    ) -> "TCNForecaster":
-        """Fit the TCN model using dataloaders."""
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
-
-        self.train()
-        for epoch in range(epochs):
-            epoch_loss = 0.0
-            n_batches = 0
-
-            # Iterate over training dataloader
-            for batch_X, batch_y in train_loader:
-                # Convert to tensors if needed
-                if isinstance(batch_X, np.ndarray):
-                    batch_X = torch.FloatTensor(batch_X).to(self.device)
-                if isinstance(batch_y, np.ndarray):
-                    batch_y = torch.FloatTensor(batch_y).to(self.device)
-
-                # Ensure correct shapes
-                if len(batch_X.shape) == 2:
-                    batch_X = batch_X.unsqueeze(1)
-                if len(batch_y.shape) == 1:
-                    batch_y = batch_y.unsqueeze(1)
-
-                outputs = self.forward(batch_X)
-                loss = criterion(outputs, batch_y)
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                epoch_loss += loss.item()
-                n_batches += 1
-
-            avg_train_loss = epoch_loss / n_batches
-
-            # Validation
-            if val_loader is not None and (epoch + 1) % 10 == 0:
-                self.eval()
-                val_loss = 0.0
-                val_batches = 0
-
-                with torch.no_grad():
-                    for batch_X, batch_y in val_loader:
-                        if isinstance(batch_X, np.ndarray):
-                            batch_X = torch.FloatTensor(batch_X).to(self.device)
-                        if isinstance(batch_y, np.ndarray):
-                            batch_y = torch.FloatTensor(batch_y).to(self.device)
-
-                        if len(batch_X.shape) == 2:
-                            batch_X = batch_X.unsqueeze(1)
-                        if len(batch_y.shape) == 1:
-                            batch_y = batch_y.unsqueeze(1)
-
-                        val_outputs = self.forward(batch_X)
-                        val_loss += criterion(val_outputs, batch_y).item()
-                        val_batches += 1
-
-                avg_val_loss = val_loss / val_batches if val_batches > 0 else 0
-                self.train()
-
-                if verbose:
-                    print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
-            elif verbose and (epoch + 1) % 10 == 0:
-                print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}")
-
-        self.is_fitted = True
-        return self
-
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Make predictions with the fitted model."""
-        if isinstance(X, pd.DataFrame):
-            X = X.values
-
-        if len(X.shape) == 2:
-            X = X.reshape(X.shape[0], 1, X.shape[1])
-
-        X_tensor = torch.FloatTensor(X).to(self.device)
+        inputs = self._prepare_inputs(X)
 
         self.eval()
         with torch.no_grad():
-            outputs = self.forward(X_tensor)
+            outputs = self.forward(inputs)
             predictions = outputs.cpu().numpy()
 
         if predictions.shape[1] == 1:
             predictions = predictions.ravel()
 
         return predictions
+
+    def _prepare_batch(self, X: Any, y: Any, training: bool = True):
+        """Convert batch to device tensors with causal-friendly shapes."""
+
+        inputs = self._prepare_inputs(X)
+        targets = self._prepare_targets(y)
+        return inputs, targets
+
+    def _to_device_tensor(self, data: Any) -> torch.Tensor:
+        """Convert arbitrary input to float tensor on device."""
+
+        if isinstance(data, torch.Tensor):
+            return data.to(self.device, dtype=torch.float32)
+
+        if isinstance(data, (pd.DataFrame, pd.Series)):
+            array = data.values
+        elif isinstance(data, np.ndarray):
+            array = data
+        else:
+            array = np.asarray(data)
+
+        return torch.as_tensor(array, dtype=torch.float32, device=self.device)
+
+    def _prepare_inputs(self, X: Any) -> torch.Tensor:
+        """Ensure inputs have shape (batch, time, features)."""
+
+        tensor = self._to_device_tensor(X)
+
+        if tensor.dim() == 2:
+            tensor = tensor.unsqueeze(1)
+        elif tensor.dim() == 3:
+            tensor = tensor.contiguous()
+        elif tensor.dim() == 1:
+            tensor = tensor.view(1, 1, -1)
+        else:
+            raise ValueError(f"Unsupported input shape for TCN: {tensor.shape}")
+
+        return tensor
+
+    def _prepare_targets(self, y: Any) -> torch.Tensor:
+        """Ensure targets have shape (batch, output_size)."""
+
+        tensor = self._to_device_tensor(y)
+
+        if tensor.dim() == 1:
+            tensor = tensor.unsqueeze(1)
+        elif tensor.dim() == 0:
+            tensor = tensor.view(1, 1)
+        elif tensor.dim() > 2:
+            tensor = tensor.view(tensor.shape[0], -1)
+
+        return tensor
 
     def score(self, X: np.ndarray, y: np.ndarray) -> float:
         """Calculate R^2 score on test data."""

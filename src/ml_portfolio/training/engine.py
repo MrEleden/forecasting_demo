@@ -6,6 +6,14 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
+try:
+    import torch
+
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None  # type: ignore[assignment]
+    TORCH_AVAILABLE = False
+
 from ml_portfolio.data.loaders import BaseDataLoader, SimpleDataLoader
 from ml_portfolio.evaluation.metrics import mae, mape, rmse
 from ml_portfolio.models.base import BaseForecaster, StatisticalForecaster
@@ -184,6 +192,52 @@ class BaseEngine(ABC):
             except Exception as e:
                 logger.warning(f"Failed to log metrics to MLflow: {e}")
 
+    def _finalize_training(
+        self,
+        train_metrics: Optional[Dict[str, float]] = None,
+        val_metrics: Optional[Dict[str, float]] = None,
+        training_time: float = 0.0,
+    ) -> None:
+        """Persist training metrics, log to MLflow, and optionally save checkpoints."""
+
+        train_metrics = train_metrics or {}
+        val_metrics = val_metrics or {}
+
+        if train_metrics:
+            self.history["train_metrics"].append(train_metrics)
+        if val_metrics:
+            self.history["val_metrics"].append(val_metrics)
+
+        self.history["epoch_times"].append(training_time)
+
+        if self.mlflow_tracker:
+            metrics_to_log = {**train_metrics, **val_metrics}
+            metrics_to_log["training_time"] = training_time
+            try:
+                self.mlflow_tracker.log_metrics(metrics_to_log)
+            except Exception as e:
+                logger.warning(f"Failed to log metrics to MLflow: {e}")
+
+        if self.verbose:
+            self._log_training_summary(train_metrics, val_metrics, training_time)
+
+        if self.checkpoint_dir:
+            self.save_checkpoint(is_best=True)
+
+    def _log_training_summary(
+        self,
+        train_metrics: Optional[Dict[str, float]],
+        val_metrics: Optional[Dict[str, float]],
+        training_time: float,
+    ) -> None:
+        """Log a human readable training summary."""
+
+        logger.info(f"Training completed in {training_time:.2f}s")
+        for metric_name, value in (train_metrics or {}).items():
+            logger.info(f"  {metric_name}: {value:.4f}")
+        for metric_name, value in (val_metrics or {}).items():
+            logger.info(f"  {metric_name}: {value:.4f}")
+
     def save_checkpoint(self, path: Optional[Path] = None, is_best: bool = False):
         """Save model checkpoint."""
         if path is None and self.checkpoint_dir:
@@ -323,7 +377,6 @@ class StatisticalEngine(BaseEngine):
         for X_train, y_train in self.train_loader:
             y_pred_train = self.model.predict(X_train)
             train_metrics = self._compute_metrics(y_train, y_pred_train, prefix="train_")
-            self.history["train_metrics"].append(train_metrics)
             break  # Single iteration for statistical models
 
         # Compute validation metrics if available
@@ -332,33 +385,10 @@ class StatisticalEngine(BaseEngine):
             for X_val, y_val in self.val_loader:
                 y_pred_val = self.model.predict(X_val)
                 val_metrics = self._compute_metrics(y_val, y_pred_val, prefix="val_")
-                self.history["val_metrics"].append(val_metrics)
                 break  # Single iteration for statistical models
 
-        # Training time
         training_time = time.time() - start_time
-        self.history["epoch_times"].append(training_time)
-
-        # Log metrics
-        if self.verbose:
-            logger.info(f"Training completed in {training_time:.2f}s")
-            for metric_name, value in train_metrics.items():
-                logger.info(f"  {metric_name}: {value:.4f}")
-            for metric_name, value in val_metrics.items():
-                logger.info(f"  {metric_name}: {value:.4f}")
-
-        # Log to MLflow
-        if self.mlflow_tracker:
-            all_metrics = {**train_metrics, **val_metrics}
-            all_metrics["training_time"] = training_time
-            try:
-                self.mlflow_tracker.log_metrics(all_metrics)
-            except Exception as e:
-                logger.warning(f"Failed to log metrics to MLflow: {e}")
-
-        # Save checkpoint
-        if self.checkpoint_dir:
-            self.save_checkpoint(is_best=True)
+        self._finalize_training(train_metrics, val_metrics, training_time)
 
         return {
             "history": self.history,
@@ -597,37 +627,12 @@ class PyTorchEngine(BaseEngine):
         # Compute metrics after training
         training_time = time.time() - start_time
 
-        # Evaluate on training set
         train_metrics = self.evaluate(self.train_loader, prefix="train_")
-        self.history["train_metrics"].append(train_metrics)
-
-        # Evaluate on validation set if available
         val_metrics = {}
         if self.val_loader is not None:
             val_metrics = self.evaluate(self.val_loader, prefix="val_")
-            self.history["val_metrics"].append(val_metrics)
 
-        self.history["epoch_times"].append(training_time)
-
-        # Log to MLflow
-        if self.mlflow_tracker:
-            all_metrics = {**train_metrics, **val_metrics}
-            all_metrics["training_time"] = training_time
-            try:
-                self.mlflow_tracker.log_metrics(all_metrics)
-            except Exception as e:
-                logger.warning(f"Failed to log metrics to MLflow: {e}")
-
-        # Save checkpoint
-        if self.checkpoint_dir:
-            self.save_checkpoint(is_best=True)
-
-        if self.verbose:
-            logger.info(f"Training completed in {training_time:.2f}s")
-            for metric_name, value in train_metrics.items():
-                logger.info(f"  {metric_name}: {value:.4f}")
-            for metric_name, value in val_metrics.items():
-                logger.info(f"  {metric_name}: {value:.4f}")
+        self._finalize_training(train_metrics, val_metrics, training_time)
 
         return {
             "history": self.history,
@@ -669,9 +674,12 @@ class PyTorchEngine(BaseEngine):
 
         # Collect predictions
         for X_batch, y_batch in data_loader:
-            y_pred = self.model.predict(X_batch)
-            all_y_true.append(y_batch)
-            all_y_pred.append(y_pred)
+            X_np = self._ensure_numpy(X_batch)
+            y_np = self._ensure_numpy(y_batch)
+
+            y_pred = self.model.predict(X_np)
+            all_y_true.append(y_np)
+            all_y_pred.append(np.asarray(y_pred))
 
         # Concatenate all batches
         y_true = np.concatenate(all_y_true, axis=0)
@@ -756,3 +764,11 @@ class PyTorchEngine(BaseEngine):
 
         if self.verbose:
             logger.info(f"Loaded model from {path}")
+
+    def _ensure_numpy(self, batch: Any) -> np.ndarray:
+        """Convert tensor-like batches to numpy arrays."""
+        if TORCH_AVAILABLE and isinstance(batch, torch.Tensor):
+            return batch.detach().cpu().numpy()
+        if isinstance(batch, np.ndarray):
+            return batch
+        return np.asarray(batch)

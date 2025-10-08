@@ -1,29 +1,33 @@
+# @package _global_
+
+defaults:
+  - /dataloader: simple
+  - /engine: statistical
+
 # Stacking Ensemble Configuration
 
 model:
   _target_: ml_portfolio.models.ensemble.stacking.StackingForecaster
 
-  # Base models (list of model configs)
+  # Base models (list of (name, model) tuples)
   base_models:
-    - name: prophet
-      model:
-        _target_: ml_portfolio.models.statistical.prophet.ProphetForecaster
-        growth: linear
-        seasonality_mode: additive
-
-    - name: lightgbm
-      model:
-        _target_: ml_portfolio.models.statistical.lightgbm.LightGBMForecaster
+    - - lightgbm
+      - _target_: ml_portfolio.models.statistical.lightgbm.LightGBMForecaster
         n_estimators: 100
         learning_rate: 0.1
         max_depth: 5
 
-    - name: xgboost
-      model:
-        _target_: ml_portfolio.models.statistical.xgboost.XGBoostForecaster
+    - - xgboost
+      - _target_: ml_portfolio.models.statistical.xgboost.XGBoostForecaster
         n_estimators: 100
         learning_rate: 0.1
         max_depth: 5
+
+    - - catboost
+      - _target_: ml_portfolio.models.statistical.catboost.CatBoostForecaster
+        iterations: 100
+        learning_rate: 0.1
+        depth: 5
 
   # Meta-learner
   meta_model:
@@ -38,11 +42,10 @@ model:
 optuna:
   # Base model selection (categorical)
   base_model_combinations:
-    - [prophet, lightgbm, xgboost]
-    - [prophet, lightgbm, catboost]
-    - [prophet, xgboost, catboost]
+    - [lightgbm, xgboost]
+    - [lightgbm, catboost]
+    - [xgboost, catboost]
     - [lightgbm, xgboost, catboost]
-    - [prophet, lightgbm, xgboost, catboost]
 
   # Meta-learner options
   meta_learner_options:
