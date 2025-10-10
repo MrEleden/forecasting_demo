@@ -5,6 +5,7 @@ This module defines the minimal abstract base classes that all forecasting model
 """
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
@@ -197,6 +198,11 @@ class PyTorchForecaster(BaseForecaster):
         verbose: bool = True,
         grad_clip: float = None,
         val_interval: int = 1,
+        early_stopping: bool = False,
+        patience: int = 10,
+        min_delta: float = 0.0,
+        monitor_metric: str = "val_loss",
+        monitor_mode: str = "min",
         **kwargs,
     ):
         """
@@ -228,6 +234,26 @@ class PyTorchForecaster(BaseForecaster):
         if grad_clip is None:
             grad_clip = getattr(self, "default_grad_clip", None)
 
+        monitor_mode = monitor_mode.lower()
+        if monitor_mode not in {"min", "max"}:
+            raise ValueError("monitor_mode must be either 'min' or 'max'")
+
+        val_interval = max(val_interval, 1)
+
+        supported_monitors = {"val_loss", "train_loss"}
+        if early_stopping and monitor_metric not in supported_monitors:
+            if verbose:
+                print(f"Early stopping monitor '{monitor_metric}' is not supported; " "disabling early stopping.")
+            early_stopping = False
+
+        if early_stopping:
+            patience = max(1, patience)
+
+        if early_stopping and monitor_metric.startswith("val") and val_loader is None:
+            if verbose:
+                print("Early stopping requested but no validation loader supplied; disabling early stopping.")
+            early_stopping = False
+
         self.train()
 
         criterion = self._get_loss_fn()
@@ -235,6 +261,12 @@ class PyTorchForecaster(BaseForecaster):
         scheduler = self._get_scheduler(optimizer)
 
         log_interval = kwargs.get("log_interval", 10)
+
+        best_metric = None
+        best_state_dict = None
+        best_epoch = -1
+        epochs_without_improvement = 0
+        total_epochs = epochs
 
         for epoch in range(epochs):
             epoch_loss = 0.0
@@ -262,14 +294,54 @@ class PyTorchForecaster(BaseForecaster):
             if verbose and (epoch + 1) % max(log_interval, 1) == 0:
                 print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {avg_train_loss:.4f}")
 
-            if val_loader is not None and (epoch + 1) % max(val_interval, 1) == 0:
+            monitored_metric = None
+
+            if val_loader is not None and (epoch + 1) % val_interval == 0:
                 val_loss = self._run_validation(val_loader, criterion)
                 if verbose:
                     print(
                         f"Epoch [{epoch + 1}/{epochs}], Train Loss: {avg_train_loss:.4f}, " f"Val Loss: {val_loss:.4f}"
                     )
 
+                if monitor_metric == "val_loss":
+                    monitored_metric = val_loss
+
+            if monitored_metric is None and monitor_metric == "train_loss":
+                monitored_metric = avg_train_loss
+
+            if early_stopping and monitored_metric is not None:
+                is_better = False
+                if best_metric is None:
+                    is_better = True
+                elif monitor_mode == "min":
+                    is_better = monitored_metric < (best_metric - min_delta)
+                else:
+                    is_better = monitored_metric > (best_metric + min_delta)
+
+                if is_better:
+                    best_metric = monitored_metric
+                    best_state_dict = deepcopy(self.state_dict())
+                    best_epoch = epoch
+                    epochs_without_improvement = 0
+                else:
+                    epochs_without_improvement += 1
+                    if epochs_without_improvement >= patience:
+                        if verbose:
+                            target = f"{monitor_metric}"
+                            print(
+                                "Early stopping triggered at epoch "
+                                f"{epoch + 1} (no improvement in {target} for {patience} checks)."
+                            )
+                        total_epochs = epoch + 1
+                        break
+
+        if early_stopping and best_state_dict is not None:
+            self.load_state_dict(best_state_dict)
+
         self.is_fitted = True
+        self.trained_epochs = total_epochs
+        self.best_epoch = best_epoch if best_epoch >= 0 else total_epochs - 1
+        self.best_metric = best_metric
         return self
 
     @abstractmethod

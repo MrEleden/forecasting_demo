@@ -43,6 +43,10 @@ def run_optimization(model: str, optuna_config: str, n_trials: int, dry_run: boo
         optuna_config: Optuna config name (e.g., 'lightgbm')
         n_trials: Number of Optuna trials to run
         dry_run: If True, print command without executing
+
+    Note:
+        Trials run sequentially to avoid Hydra launcher conflicts.
+        For parallel optimization, configure Optuna study with parallel backend.
     """
     cmd = [
         "python",
@@ -55,6 +59,9 @@ def run_optimization(model: str, optuna_config: str, n_trials: int, dry_run: boo
         "hydra/sweeper=optuna",
         f"+optuna={optuna_config}",
         f"hydra.sweeper.n_trials={n_trials}",
+        "experiment_name=walmart_sales_forecasting_optimization",
+        "verbose=false",
+        "log_level=ERROR",
     ]
 
     print(f"\n{'='*80}")
@@ -162,7 +169,7 @@ Examples:
         print("\n✓ All optimizations completed successfully!")
         print("\nNext steps:")
         print("  1. Check MLflow UI for results: mlflow ui")
-        print("  2. Compare models in walmart_sales_forecasting experiment")
+        print("  2. Compare models in walmart_sales_forecasting_optimization experiment")
         print("  3. Select best model based on val_MAPE metric")
         return 0
 

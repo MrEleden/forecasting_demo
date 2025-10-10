@@ -48,6 +48,43 @@ if torch is not None:
         def _get_scheduler(self, optimizer):
             return torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.9)
 
+    class ProgrammableForecaster(PyTorchForecaster, nn.Module):
+        """PyTorch forecaster with programmable validation metrics for testing."""
+
+        def __init__(self, input_size: int = 2, device: str = "cpu"):
+            PyTorchForecaster.__init__(self, device=device)
+            nn.Module.__init__(self)
+
+            self.linear = nn.Linear(input_size, 1)
+            self.learning_rate = 0.1
+            self._val_iter = None
+
+            self.to(self.device)
+
+        def forward(self, inputs):
+            return self.linear(inputs)
+
+        def predict(self, X: np.ndarray) -> np.ndarray:
+            tensor = self._to_tensor(X)
+            self.eval()
+            with torch.no_grad():
+                outputs = self.forward(tensor)
+            return outputs.detach().cpu().numpy().squeeze(-1)
+
+        def set_validation_losses(self, losses):
+            if losses is None:
+                self._val_iter = None
+            else:
+                self._val_iter = iter(float(value) for value in losses)
+
+        def _run_validation(self, loader, criterion):  # type: ignore[override]
+            if self._val_iter is None:
+                return super()._run_validation(loader, criterion)
+            try:
+                return next(self._val_iter)
+            except StopIteration:
+                return super()._run_validation(loader, criterion)
+
 else:
 
     class LinearRegressionForecaster:  # pragma: no cover - placeholder for type checkers
@@ -99,3 +136,82 @@ def test_pytorch_forecaster_training_loop_reduces_loss():
 
     assert model.is_fitted is True
     assert final_loss < initial_loss
+
+
+@pytest.mark.skipif(torch is None, reason="PyTorch is required for these tests")
+def test_early_stopping_respects_patience_and_restores_best_state():
+    train_dataset, val_dataset = _build_synthetic_dataset()
+
+    train_loader = PyTorchDataLoader(train_dataset, batch_size=len(train_dataset), shuffle=False)
+    val_loader = PyTorchDataLoader(val_dataset, batch_size=len(val_dataset), shuffle=False)
+
+    model = ProgrammableForecaster(device="cpu")
+    model.set_validation_losses([1.0, 0.8, 0.8, 0.81, 0.82])
+
+    model.fit(
+        train_loader,
+        val_loader=val_loader,
+        epochs=20,
+        early_stopping=True,
+        patience=2,
+        min_delta=0.0,
+        monitor_metric="val_loss",
+        monitor_mode="min",
+        val_interval=1,
+        verbose=False,
+    )
+
+    assert model.trained_epochs == 4
+    assert model.best_epoch == 1
+    assert model.best_metric == pytest.approx(0.8)
+
+
+@pytest.mark.skipif(torch is None, reason="PyTorch is required for these tests")
+def test_unsupported_monitor_disables_early_stopping():
+    train_dataset, val_dataset = _build_synthetic_dataset()
+
+    train_loader = PyTorchDataLoader(train_dataset, batch_size=len(train_dataset), shuffle=False)
+    val_loader = PyTorchDataLoader(val_dataset, batch_size=len(val_dataset), shuffle=False)
+
+    model = ProgrammableForecaster(device="cpu")
+    model.set_validation_losses([1.0, 0.9, 0.85])
+
+    model.fit(
+        train_loader,
+        val_loader=val_loader,
+        epochs=5,
+        early_stopping=True,
+        patience=1,
+        monitor_metric="val_rmse",
+        monitor_mode="min",
+        val_interval=1,
+        verbose=False,
+    )
+
+    assert model.trained_epochs == 5
+    assert model.best_metric is None
+
+
+@pytest.mark.skipif(torch is None, reason="PyTorch is required for these tests")
+def test_train_loss_monitor_is_supported():
+    train_dataset, _ = _build_synthetic_dataset()
+
+    train_loader = PyTorchDataLoader(train_dataset, batch_size=len(train_dataset), shuffle=False)
+
+    model = ProgrammableForecaster(device="cpu")
+    model.set_validation_losses(None)
+
+    model.fit(
+        train_loader,
+        val_loader=None,
+        epochs=3,
+        early_stopping=True,
+        patience=1,
+        monitor_metric="train_loss",
+        monitor_mode="min",
+        val_interval=1,
+        verbose=False,
+    )
+
+    assert model.trained_epochs == 3
+    assert model.best_metric is not None

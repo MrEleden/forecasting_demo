@@ -18,6 +18,8 @@ import numpy as np
 from hydra.utils import get_original_cwd, instantiate
 from omegaconf import DictConfig, OmegaConf
 
+from ml_portfolio.data.quality import validate_walmart_raw_dataset
+
 # Optional imports
 try:
     import torch
@@ -126,6 +128,40 @@ def train_pipeline(cfg: DictConfig) -> Dict[str, Any]:
     # ========================================================================
     setup_logging(cfg)
     set_seed(cfg.get("seed", 42))
+
+    if cfg.get("enable_data_quality_checks", True):
+        dataset_cfg = cfg.get("dataset_factory")
+        if dataset_cfg is None:
+            logger.warning("Dataset factory configuration missing; skipping data-quality checks.")
+        else:
+            data_path_cfg = dataset_cfg.get("data_path")
+            if data_path_cfg:
+                raw_data_path = Path(data_path_cfg)
+                if not raw_data_path.is_absolute():
+                    raw_data_path = Path(get_original_cwd()) / raw_data_path
+
+                try:
+                    dq_report = validate_walmart_raw_dataset(raw_data_path, raise_on_failure=True)
+                except FileNotFoundError as exc:
+                    logger.error("Raw data missing for validation: %s", exc)
+                    raise
+                except ValueError as exc:
+                    logger.error("Great Expectations validation failed: %s", exc)
+                    raise
+                except RuntimeError as exc:
+                    logger.warning("Data-quality checks skipped: %s", exc)
+                else:
+                    if dq_report.get("skipped"):
+                        logger.warning("Data-quality checks skipped: %s", dq_report.get("reason"))
+                    else:
+                        stats = dq_report.get("statistics", {})
+                        logger.info(
+                            "Great Expectations validation passed (expectations=%s, success_rate=%.2f%%)",
+                            stats.get("evaluated_expectations", 0),
+                            stats.get("success_percent", 0.0) * 100,
+                        )
+            else:
+                logger.warning("No data_path specified for dataset_factory; skipping data-quality checks.")
 
     logger.info("Phase 0-1: Setup complete")
     # ========================================================================

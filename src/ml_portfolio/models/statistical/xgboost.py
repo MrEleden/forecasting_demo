@@ -187,8 +187,10 @@ class XGBoostForecaster(StatisticalForecaster):
         if self.model is None:
             raise ValueError("Model must be fitted before prediction")
 
-        if isinstance(X, pd.DataFrame):
-            X = X.values
+        # Convert to DataFrame with feature names to avoid sklearn warning
+        if not isinstance(X, pd.DataFrame):
+            if hasattr(self, "feature_names_"):
+                X = pd.DataFrame(X, columns=self.feature_names_)
 
         return self.model.predict(X)
 

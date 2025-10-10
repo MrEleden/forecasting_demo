@@ -30,3 +30,4 @@ pydantic>=2.0.0
 
 # Data validation
 pandera>=0.17.0
+great_expectations>=0.18.0

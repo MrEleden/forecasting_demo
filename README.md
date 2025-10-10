@@ -44,7 +44,15 @@ python src/ml_portfolio/scripts/download_all_data.py --dataset walmart
 python -m ml_portfolio.training.train dataset=walmart model=lightgbm
 ```
 
-### 4. Minimal Python snippet
+### 4. View the portfolio dashboard
+
+```powershell
+streamlit run src/ml_portfolio/dashboard/app.py
+```
+
+Open http://localhost:8501 to explore the narrative-driven portfolio with 6 tabs covering models, experiments, benchmarks, and engineering/data science perspectives.
+
+### 5. Minimal Python snippet
 
 ```python
 from ml_portfolio.data.dataset_factory import DatasetFactory
