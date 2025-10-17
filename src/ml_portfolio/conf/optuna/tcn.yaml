@@ -1,6 +1,9 @@
 # Optuna hyperparameter optimization configuration for TCN
 # Search space for Temporal Convolutional Network
 
+# Study configuration
+study_name: walmart_tcn_${now:%Y%m%d_%H%M%S}
+
 sampler:
   _target_: optuna.samplers.TPESampler
   seed: 42

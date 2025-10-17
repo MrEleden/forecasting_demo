@@ -8,17 +8,17 @@
 _target_: ml_portfolio.training.engine.PyTorchEngine
 
 # Training parameters
-max_epochs: 100
+max_epochs: 150  # Increased for larger/deeper models
 verbose: true
 
 # Early stopping
 early_stopping: true
-patience: 10
+patience: 15  # Increased patience for larger models
 min_delta: 0.0001
 monitor_metric: val_loss  # Metric to monitor for early stopping
 
 # Gradient clipping
-grad_clip: null  # Set to value like 1.0 to enable gradient clipping
+grad_clip: 1.0  # Enable gradient clipping for deeper networks (prevents exploding gradients)
 
 # Device management
 device: auto  # auto (use GPU if available), cuda, or cpu

@@ -9,9 +9,11 @@ This directory contains Optuna hyperparameter search space definitions for all a
 ### Gradient Boosting Models
 
 #### 1. LightGBM (`lightgbm_search_space.yaml`)
+
 **Best for**: Fast training, large datasets, interpretability
 
 **Key Parameters**:
+
 - `n_estimators`: 100-1000 (number of boosting iterations)
 - `learning_rate`: 0.001-0.3 (log scale)
 - `max_depth`: 3-12 (tree depth)
@@ -21,15 +23,18 @@ This directory contains Optuna hyperparameter search space definitions for all a
 **Trials**: 50 (default)
 
 **Usage**:
+
 ```bash
 python src/ml_portfolio/training/train.py --config-name walmart \
     model=lightgbm use_optuna=true --multirun
 ```
 
 #### 2. XGBoost (`xgboost_search_space.yaml`)
+
 **Best for**: Robust performance, handling missing data, feature importance
 
 **Key Parameters**:
+
 - `n_estimators`: 100-1000
 - `learning_rate`: 0.001-0.3 (log scale)
 - `max_depth`: 3-12
@@ -40,15 +45,18 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 **Trials**: 50 (default)
 
 **Usage**:
+
 ```bash
 python src/ml_portfolio/training/train.py --config-name walmart \
     model=xgboost use_optuna=true --multirun
 ```
 
 #### 3. CatBoost (`catboost_search_space.yaml`)
+
 **Best for**: Categorical features, out-of-the-box performance
 
 **Key Parameters**:
+
 - `iterations`: 100-1000 (equivalent to n_estimators)
 - `learning_rate`: 0.001-0.3 (log scale)
 - `depth`: 4-10 (tree depth)
@@ -58,6 +66,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 **Trials**: 50 (default)
 
 **Usage**:
+
 ```bash
 python src/ml_portfolio/training/train.py --config-name walmart \
     model=catboost use_optuna=true --multirun
@@ -66,9 +75,11 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ### Tree-Based Models
 
 #### 4. Random Forest (`random_forest_search_space.yaml`)
+
 **Best for**: Baseline, feature importance, reduced overfitting
 
 **Key Parameters**:
+
 - `n_estimators`: 50-500 (number of trees)
 - `max_depth`: 5-30
 - `min_samples_split`: 2-20
@@ -79,6 +90,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 **Trials**: 50 (default)
 
 **Usage**:
+
 ```bash
 python src/ml_portfolio/training/train.py --config-name walmart \
     model=random_forest use_optuna=true --multirun
@@ -87,9 +99,11 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ### Statistical Models
 
 #### 5. Prophet (`prophet_search_space.yaml`)
+
 **Best for**: Strong seasonality, holidays, interpretable components
 
 **Key Parameters**:
+
 - `changepoint_prior_scale`: 0.001-0.5 (trend flexibility)
 - `seasonality_prior_scale`: 0.01-10 (seasonality flexibility)
 - `seasonality_mode`: additive/multiplicative
@@ -99,15 +113,18 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 **Trials**: 40 (fewer parameters)
 
 **Usage**:
+
 ```bash
 python src/ml_portfolio/training/train.py --config-name walmart \
     model=prophet use_optuna=true --multirun
 ```
 
 #### 6. ARIMA (`arima_search_space.yaml`)
+
 **Best for**: Univariate time series, trend and seasonality
 
 **Key Parameters**:
+
 - `order.0` (p): 0-5 (AR order)
 - `order.1` (d): 0-2 (differencing order)
 - `order.2` (q): 0-5 (MA order)
@@ -117,6 +134,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 **Trials**: 100 (large discrete space)
 
 **Usage**:
+
 ```bash
 python src/ml_portfolio/training/train.py --config-name walmart \
     model=arima use_optuna=true --multirun
@@ -125,9 +143,11 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ### Deep Learning Models
 
 #### 7. LSTM (`lstm_search_space.yaml`)
+
 **Best for**: Long sequences, complex patterns, non-linear relationships
 
 **Key Parameters**:
+
 - `hidden_size`: 32-256 (LSTM units)
 - `num_layers`: 1-4 (stacked LSTM layers)
 - `dropout`: 0-0.5
@@ -139,6 +159,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 **Trials**: 60 (more complex)
 
 **Usage**:
+
 ```bash
 python src/ml_portfolio/training/train.py --config-name walmart \
     model=lstm use_optuna=true --multirun
@@ -147,6 +168,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ## Multi-Model Optimization
 
 ### Compare All Models
+
 ```bash
 # Optimize all 7 models (50+ trials each)
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -155,6 +177,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ```
 
 ### Compare Gradient Boosting Models
+
 ```bash
 # Best performers for tabular data
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -163,6 +186,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ```
 
 ### Compare Statistical Models
+
 ```bash
 # Traditional time series methods
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -171,6 +195,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ```
 
 ### Compare ML Models
+
 ```bash
 # Machine learning approaches
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -181,6 +206,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ## Customization
 
 ### Override Trial Count
+
 ```bash
 # More thorough optimization
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -189,6 +215,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ```
 
 ### Override Specific Parameter Range
+
 ```bash
 # Narrow search space for faster results
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -199,6 +226,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ```
 
 ### Use Persistent Storage
+
 ```bash
 # Save study for analysis and resumability
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -209,17 +237,18 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 
 ## Performance Comparison
 
-| Model | Speed | Accuracy | Memory | Interpretability | Best Use Case |
-|-------|-------|----------|--------|------------------|---------------|
-| LightGBM | ⚡⚡⚡ | ⭐⭐⭐⭐ | 💾💾 | 📊📊📊 | Large datasets, fast iteration |
-| XGBoost | ⚡⚡ | ⭐⭐⭐⭐⭐ | 💾💾💾 | 📊📊📊 | Best accuracy, feature importance |
-| CatBoost | ⚡ | ⭐⭐⭐⭐ | 💾💾💾 | 📊📊📊 | Categorical features |
-| Random Forest | ⚡⚡ | ⭐⭐⭐ | 💾💾💾 | 📊📊📊📊 | Baseline, feature selection |
-| Prophet | ⚡⚡⚡ | ⭐⭐⭐ | 💾 | 📊📊📊📊📊 | Strong seasonality, holidays |
-| ARIMA | ⚡⚡ | ⭐⭐ | 💾 | 📊📊📊📊 | Univariate, traditional |
-| LSTM | ⚡ | ⭐⭐⭐⭐ | 💾💾💾💾 | 📊 | Long sequences, non-linear |
+| Model         | Speed  | Accuracy   | Memory   | Interpretability | Best Use Case                     |
+| ------------- | ------ | ---------- | -------- | ---------------- | --------------------------------- |
+| LightGBM      | ⚡⚡⚡ | ⭐⭐⭐⭐   | 💾💾     | 📊📊📊           | Large datasets, fast iteration    |
+| XGBoost       | ⚡⚡   | ⭐⭐⭐⭐⭐ | 💾💾💾   | 📊📊📊           | Best accuracy, feature importance |
+| CatBoost      | ⚡     | ⭐⭐⭐⭐   | 💾💾💾   | 📊📊📊           | Categorical features              |
+| Random Forest | ⚡⚡   | ⭐⭐⭐     | 💾💾💾   | 📊📊📊📊         | Baseline, feature selection       |
+| Prophet       | ⚡⚡⚡ | ⭐⭐⭐     | 💾       | 📊📊📊📊📊       | Strong seasonality, holidays      |
+| ARIMA         | ⚡⚡   | ⭐⭐       | 💾       | 📊📊📊📊         | Univariate, traditional           |
+| LSTM          | ⚡     | ⭐⭐⭐⭐   | 💾💾💾💾 | 📊               | Long sequences, non-linear        |
 
 Legend:
+
 - Speed: ⚡ (1-5, more is faster)
 - Accuracy: ⭐ (1-5, more is better)
 - Memory: 💾 (1-5, more means higher usage)
@@ -228,6 +257,7 @@ Legend:
 ## Tips for Optimization
 
 ### 1. Start Small
+
 ```bash
 # Quick test with 10 trials
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -236,7 +266,9 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ```
 
 ### 2. Use Pruning
+
 The default MedianPruner stops bad trials early. Adjust for more aggressive pruning:
+
 ```bash
 python src/ml_portfolio/training/train.py --config-name walmart \
     model=xgboost use_optuna=true \
@@ -245,6 +277,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ```
 
 ### 3. Parallel Optimization (Use with Caution)
+
 ```bash
 # Use all CPU cores (requires more RAM)
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -253,6 +286,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ```
 
 ### 4. Resume from Storage
+
 ```bash
 # First run
 python src/ml_portfolio/training/train.py --config-name walmart \
@@ -272,6 +306,7 @@ python src/ml_portfolio/training/train.py --config-name walmart \
 ## Visualization
 
 After optimization, visualize results:
+
 ```bash
 python src/ml_portfolio/scripts/visualize_optuna.py \
     --study-name walmart_lightgbm_optimization \

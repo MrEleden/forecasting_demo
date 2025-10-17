@@ -13,11 +13,11 @@ experiment:
   name: transportation_tsi_baseline
   tags: [baseline, tsi]
 
-# Training settings  
+# Training settings
 trainer:
   max_epochs: 100
   patience: 10
-  
+
 # Evaluation settings
 evaluation:
   primary_metric: RMSE

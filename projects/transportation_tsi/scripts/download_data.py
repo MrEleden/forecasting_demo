@@ -10,15 +10,16 @@ Usage:
 
 Data Source:
     - Bureau of Transportation Statistics (BTS) Data Portal
-    - URL: https://data.bts.gov/Research-and-Statistics/Transportation-Services-Index-and-Seasonally-Adjus/bw6n-ddqk/about_data
+    - URL: https://data.bts.gov/Research-and-Statistics/
+      Transportation-Services-Index-and-Seasonally-Adjus/bw6n-ddqk/about_data
     - API Endpoint: https://data.bts.gov/resource/bw6n-ddqk.csv
 """
 
-import requests
-import pandas as pd
-from pathlib import Path
-import json
 from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+import requests
 
 
 def download_tsi_data():
@@ -68,7 +69,7 @@ def download_tsi_data():
                 print(f"Could not parse dates in {date_col}: {e}")
 
         # Show sample data
-        print(f"Sample data (first 3 rows):")
+        print("Sample data (first 3 rows):")
         print(df.head(3).to_string())
 
         return csv_file
@@ -88,7 +89,7 @@ def create_sample_tsi_data(data_raw):
     """Create sample TSI data for development purposes."""
 
     # Generate sample TSI data
-    from datetime import datetime, timedelta
+
     import numpy as np
 
     # Create monthly time series from 2010 to 2024
@@ -187,7 +188,8 @@ if __name__ == "__main__":
     print("=" * 55)
     print("Source: BTS Data Portal")
     print(
-        "URL: https://data.bts.gov/Research-and-Statistics/Transportation-Services-Index-and-Seasonally-Adjus/bw6n-ddqk/about_data"
+        "URL: https://data.bts.gov/Research-and-Statistics/"
+        "Transportation-Services-Index-and-Seasonally-Adjus/bw6n-ddqk/about_data"
     )
 
     # Download data
@@ -209,7 +211,8 @@ if __name__ == "__main__":
         print(f"\nDownload process failed: {e}")
         print("\nManual download alternative:")
         print(
-            "   1. Visit: https://data.bts.gov/Research-and-Statistics/Transportation-Services-Index-and-Seasonally-Adjus/bw6n-ddqk/about_data"
+            "   1. Visit: https://data.bts.gov/Research-and-Statistics/"
+            "Transportation-Services-Index-and-Seasonally-Adjus/bw6n-ddqk/about_data"
         )
         print("   2. Click 'Export' → 'CSV'")
         print("   3. Save as: projects/transportation_tsi/data/raw/tsi_official.csv")

@@ -13,11 +13,11 @@ experiment:
   name: rideshare_demand_ola_baseline
   tags: [baseline, ola]
 
-# Training settings  
+# Training settings
 trainer:
   max_epochs: 100
   patience: 10
-  
+
 # Evaluation settings
 evaluation:
   primary_metric: MAPE

@@ -15,24 +15,22 @@ Requirements:
     - Kaggle API credentials configured: ~/.kaggle/kaggle.json
 """
 
-import os
-import zipfile
-from pathlib import Path
 import subprocess
 import sys
+import zipfile
+from pathlib import Path
 
 
 def setup_kaggle_api():
     """Check if Kaggle API is installed and configured."""
     try:
-        import kaggle
+        import kaggle  # noqa: F401
 
         print("Kaggle API is installed")
         return True
     except ImportError:
         print("Kaggle API not installed. Installing...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "kaggle"])
-        import kaggle
 
         return True
 
@@ -73,7 +71,7 @@ def download_walmart_data():
 
             # List downloaded files
             csv_files = list(data_raw.glob("*.csv"))
-            print(f"\nDownloaded files:")
+            print("\nDownloaded files:")
             for csv_file in csv_files:
                 size_mb = csv_file.stat().st_size / (1024 * 1024)
                 print(f"  - {csv_file.name} ({size_mb:.1f} MB)")

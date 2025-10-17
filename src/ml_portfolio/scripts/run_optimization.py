@@ -48,6 +48,12 @@ def run_optimization(model: str, optuna_config: str, n_trials: int, dry_run: boo
         Trials run sequentially to avoid Hydra launcher conflicts.
         For parallel optimization, configure Optuna study with parallel backend.
     """
+    # Generate timestamp for study name
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    study_name = f"walmart_{model}_{timestamp}"
+
     cmd = [
         "python",
         "src/ml_portfolio/training/train.py",
@@ -59,9 +65,10 @@ def run_optimization(model: str, optuna_config: str, n_trials: int, dry_run: boo
         "hydra/sweeper=optuna",
         f"+optuna={optuna_config}",
         f"hydra.sweeper.n_trials={n_trials}",
+        f"hydra.sweeper.study_name={study_name}",
         "experiment_name=walmart_sales_forecasting_optimization",
         "verbose=false",
-        "log_level=ERROR",
+        "log_level=WARNING",
     ]
 
     print(f"\n{'='*80}")

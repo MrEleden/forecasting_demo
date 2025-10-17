@@ -1,6 +1,7 @@
 # Ola Ride-sharing Demand - Data Generation Guide
 
 ## Dataset Overview
+
 - **Source**: Generated synthetic data (realistic patterns)
 - **Size**: ~3.32 MB
 - **Format**: CSV file (ola_ride_requests.csv)
@@ -9,6 +10,7 @@
 - **Coverage**: 12 pickup zones across major Indian cities
 
 ## Dataset Features
+
 - `datetime`: Timestamp (hourly frequency)
 - `pickup_zone`: Location identifier (12 zones)
 - `ride_requests`: Target variable (ride demand count)
@@ -21,42 +23,52 @@
 - `month`: Month (1-12)
 
 ## Pickup Zones
+
 ### Mumbai (3 zones)
+
 - Mumbai_Central
 - Mumbai_Andheri
 - Mumbai_Bandra
 
 ### Delhi (3 zones)
+
 - Delhi_CP (Connaught Place)
 - Delhi_Gurgaon
 - Delhi_Noida
 
 ### Bangalore (3 zones)
+
 - Bangalore_Koramangala
 - Bangalore_Whitefield
 - Bangalore_MG_Road
 
 ### Other Cities (3 zones)
+
 - Chennai_T_Nagar
 - Pune_Koregaon_Park
 - Hyderabad_Hitech_City
 
 ## Data Patterns
+
 ### Daily Patterns
+
 - **Morning Peak**: 8-10 AM (1.5x demand)
 - **Evening Peak**: 6-8 PM (1.8x demand)
 - **Night Hours**: Reduced demand
 
 ### Weekly Patterns
+
 - **Weekdays**: Higher commuter demand
 - **Weekends**: 30% reduced demand, different timing patterns
 
 ### Seasonal Patterns
+
 - **Monsoon Effect**: 40% demand reduction during rain
 - **Festival Boost**: 40% increase during major festivals (Diwali)
 - **Temperature Impact**: Demand varies with extreme temperatures
 
 ### City-specific Patterns
+
 - **Mumbai**: Highest base demand (25 rides/hour)
 - **Delhi**: Medium demand (22 rides/hour)
 - **Bangalore**: Tech hub patterns (20 rides/hour)
@@ -70,6 +82,7 @@ python scripts/generate_data.py
 ```
 
 ## Expected Output
+
 ```
 🚴 Creating sample Ola bike ride-sharing data...
 ✅ Created: ola_ride_requests.csv (3.3 MB)
@@ -78,6 +91,7 @@ python scripts/generate_data.py
 ```
 
 ## Data Validation
+
 ```bash
 # Check generated file
 ls data/raw/ola_ride_requests.csv
@@ -94,19 +108,22 @@ print(f'Date range: {df.datetime.min()} to {df.datetime.max()}')
 ```
 
 ## Use Cases
+
 - **Demand Forecasting**: Predict hourly ride requests
 - **Resource Planning**: Optimize driver allocation
 - **Dynamic Pricing**: Demand-based pricing models
 - **Weather Impact**: Weather-aware demand prediction
 
 ## Model Targets
+
 - **Short-term**: Next 24-48 hours demand
 - **Medium-term**: Weekly demand patterns
 - **Long-term**: Monthly/seasonal trends
 - **Multi-zone**: Cross-location demand modeling
 
 ## Next Steps
+
 1. **EDA**: Explore temporal patterns and seasonality
-2. **Weather Analysis**: Rain impact on demand
-3. **Peak Detection**: Rush hour pattern analysis
-4. **Forecasting Models**: ARIMA, Prophet, LSTM for demand prediction
+1. **Weather Analysis**: Rain impact on demand
+1. **Peak Detection**: Rush hour pattern analysis
+1. **Forecasting Models**: ARIMA, Prophet, LSTM for demand prediction

@@ -14,10 +14,11 @@ Usage:
     python generate_data.py
 """
 
-import pandas as pd
-import numpy as np
+from datetime import datetime
 from pathlib import Path
-from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
 
 
 def generate_inventory_data():
@@ -133,7 +134,7 @@ def generate_inventory_data():
     print(f"Date range: {inventory_data['date'].min()} to {inventory_data['date'].max()}")
 
     # Show category breakdown
-    print(f"\nCategory breakdown:")
+    print("\nCategory breakdown:")
     for category in categories.keys():
         cat_data = inventory_data[inventory_data["category"] == category]
         avg_demand = cat_data["demand"].mean()

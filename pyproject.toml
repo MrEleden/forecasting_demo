@@ -53,6 +53,7 @@ addopts = [
     "--tb=short",
     "--cov=src/ml_portfolio/data",
     "--cov=src/ml_portfolio/models",
+    "--cov=src/ml_portfolio/evaluation",
     "--cov=src/ml_portfolio/pipelines",
     "--cov=src/ml_portfolio/training",
     "--cov-report=term-missing",
@@ -65,6 +66,7 @@ addopts = [
 source = [
     "src/ml_portfolio/data",
     "src/ml_portfolio/models",
+    "src/ml_portfolio/evaluation",
     "src/ml_portfolio/pipelines",
     "src/ml_portfolio/training"
 ]
@@ -82,7 +84,8 @@ omit = [
     "*/models/statistical/arima.py",
     "*/models/statistical/prophet.py",
     "*/models/statistical/sarimax.py",
-    "*/models/ensemble/*",
+    "*/dashboard/*",
+    "*/scripts/*",
 ]
 
 [tool.coverage.report]

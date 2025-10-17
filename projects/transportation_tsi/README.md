@@ -1,6 +1,7 @@
 # Transportation Services Index (TSI) - Data Download Guide
 
 ## Dataset Overview
+
 - **Source**: [U.S. Bureau of Transportation Statistics (BTS)](https://data.bts.gov/Research-and-Statistics/Transportation-Services-Index-and-Seasonally-Adjus/bw6n-ddqk/about_data)
 - **Size**: ~0.19 MB
 - **Format**: CSV file (tsi_official.csv)
@@ -9,9 +10,11 @@
 - **Frequency**: Monthly economic indicators
 
 ## Dataset Description
+
 The Transportation Services Index (TSI) is a seasonally adjusted economic indicator that tracks freight and passenger traffic in the United States. It includes data across multiple transportation modes:
 
 ### Key Indicators
+
 - **TSI Total**: Overall transportation services index
 - **TSI Freight**: Freight transportation component
 - **TSI Passenger**: Passenger transportation component
@@ -23,11 +26,13 @@ The Transportation Services Index (TSI) is a seasonally adjusted economic indica
 - **Waterborne**: Freight transportation
 
 ### Economic Context Features
+
 - **Industrial Production**: Manufacturing index
 - **Inventory-to-Sales Ratio**: Economic indicator
 - **Unemployment**: Economic context data
 
 ## Data Files
+
 - **tsi_official.csv**: Official BTS data (307 records, 66 columns)
 - **tsi_sample.csv**: Simplified sample data (180 records, 7 columns)
 
@@ -39,6 +44,7 @@ python scripts/download_data.py
 ```
 
 ## Expected Output
+
 ```
 📊 307 records with 66 columns
 📅 Date range: 2000-01 to 2025-07
@@ -47,12 +53,14 @@ python scripts/download_data.py
 ```
 
 ## Data Quality
+
 - ✅ Official government data source
 - ✅ Regular monthly updates
 - ✅ Seasonally adjusted indicators
 - ✅ Multiple transportation modes covered
 
 ## Use Cases
+
 - **Economic Forecasting**: Predict transportation demand
 - **Business Intelligence**: Transportation sector analysis
 - **Policy Analysis**: Infrastructure investment planning
@@ -61,11 +69,13 @@ python scripts/download_data.py
 ## Troubleshooting
 
 ### Network Issues
+
 - Government APIs can be slow: increase timeout
 - Try manual download if automated fails
 - Use sample data for development/testing
 
 ### Data Validation
+
 ```bash
 # Check downloaded files
 ls data/raw/
@@ -73,7 +83,8 @@ ls data/raw/
 ```
 
 ## Next Steps
+
 1. **EDA**: Explore seasonal patterns and trends
-2. **Economic Analysis**: Correlate with business cycles
-3. **Time Series Models**: ARIMA, Prophet, LSTM forecasting
-4. **Multi-variate Analysis**: Freight vs passenger patterns
+1. **Economic Analysis**: Correlate with business cycles
+1. **Time Series Models**: ARIMA, Prophet, LSTM forecasting
+1. **Multi-variate Analysis**: Freight vs passenger patterns

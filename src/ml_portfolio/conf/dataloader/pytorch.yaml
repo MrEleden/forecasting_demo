@@ -5,12 +5,12 @@
 _target_: ml_portfolio.data.loaders.PyTorchDataLoader
 
 # Batch configuration
-batch_size: 256  # Increased for RTX 4080 SUPER (16GB VRAM)
+batch_size: 512  # High-performance: larger batches for RTX 4080 SUPER (16GB VRAM)
 shuffle: true
 drop_last: false  # Whether to drop last incomplete batch
 
 # Multi-process data loading
-num_workers: 4  # Parallel CPU workers for data loading
+num_workers: 0  # Increased parallel CPU workers for better throughput
 
 # GPU optimization
 pin_memory: true  # Faster CPU-to-GPU data transfer

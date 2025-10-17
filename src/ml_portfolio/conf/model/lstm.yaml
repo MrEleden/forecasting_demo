@@ -14,12 +14,12 @@ model:
   # Model instantiation
   _target_: ml_portfolio.models.pytorch.lstm.LSTMForecaster
 
-  # LSTM architecture
+  # LSTM architecture (HIGH-PERFORMANCE config for RTX 4080 SUPER)
   input_size: 1  # Will be set based on dataset
-  hidden_size: 128
-  num_layers: 2
-  dropout: 0.2
-  bidirectional: false
+  hidden_size: 512  # Increased from 128 to 512 for better GPU utilization
+  num_layers: 4  # Increased from 2 to 4 for deeper network
+  dropout: 0.3  # Increased dropout for larger model
+  bidirectional: true  # Bidirectional LSTM doubles hidden state size
 
   # Output
   output_size: 1  # Forecast horizon

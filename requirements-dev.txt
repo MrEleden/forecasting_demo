@@ -13,6 +13,9 @@ xgboost>=1.7.0
 catboost>=1.2.0
 scipy>=1.11.0
 
+# Data quality validation
+great-expectations>=0.18.0
+
 # Code quality
 black>=23.0.0
 ruff>=0.1.0

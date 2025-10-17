@@ -10,6 +10,7 @@ Follows Burkov's ML Engineering principles:
 
 import logging
 import random
+import warnings
 from pathlib import Path
 from typing import Any, Dict
 
@@ -19,6 +20,10 @@ from hydra.utils import get_original_cwd, instantiate
 from omegaconf import DictConfig, OmegaConf
 
 from ml_portfolio.data.quality import validate_walmart_raw_dataset
+
+# Suppress SQLAlchemy 2.0 deprecation warnings from Optuna
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="optuna")
+warnings.filterwarnings("ignore", message=".*declarative_base.*")
 
 # Optional imports
 try:

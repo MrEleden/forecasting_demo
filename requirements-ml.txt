@@ -15,4 +15,4 @@ optuna>=2.10.0,<3.0.0
 torch>=2.0.0
 
 # Prophet forecasting (can be problematic on some systems)
-prophet>=1.1.4  
+prophet>=1.1.4

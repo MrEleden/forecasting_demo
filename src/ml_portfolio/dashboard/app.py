@@ -418,6 +418,13 @@ def render_experiments_tab():
     st.markdown("---")
     st.subheader("Run table")
 
+    # Warning about optimization runs
+    st.warning(
+        "⚠️ **Note**: Hyperparameter optimization saves ALL trial runs to MLflow. "
+        "This can result in hundreds of runs per optimization session. "
+        "The table below shows all runs including intermediate optimization trials."
+    )
+
     # Filters
     col_model, col_status = st.columns(2)
     models = sorted(runs["model"].dropna().unique())
@@ -446,9 +453,9 @@ def render_experiments_tab():
     st.dataframe(
         filtered[display_cols].style.format(
             {
-                "val_MAPE": "{:.2%}",
+                "val_MAPE": "{:.2f}%",  # Already a percentage (not decimal), just add % symbol
                 "val_RMSE": "{:.2f}",
-                "test_MAPE": "{:.2%}",
+                "test_MAPE": "{:.2f}%",  # Already a percentage (not decimal), just add % symbol
                 "test_RMSE": "{:.2f}",
             },
             na_rep="—",
@@ -502,23 +509,36 @@ def render_benchmarks_tab():
         return
 
     st.markdown("---")
-    st.subheader("Leaderboard (sorted by validation MAPE)")
+    st.subheader("Leaderboard (sorted by test MAPE)")
 
-    leaderboard = runs.dropna(subset=["val_MAPE"]).sort_values("val_MAPE").drop_duplicates("model", keep="first")
+    # Filter for runs with test MAPE, fallback to validation MAPE
+    leaderboard = runs.dropna(subset=["test_MAPE"]).sort_values("test_MAPE").drop_duplicates("model", keep="first")
 
     if leaderboard.empty:
-        st.warning("No runs with validation MAPE.")
-        return
+        st.warning("⚠️ No runs with test metrics found. This usually means:")
+        st.markdown(
+            """
+            - Training runs are still in progress (test evaluation happens at the end)
+            - Optimization trials were interrupted before final evaluation
+            - Test set evaluation was skipped in training config
+
+            Showing runs sorted by validation MAPE instead:
+            """
+        )
+        leaderboard = runs.dropna(subset=["val_MAPE"]).sort_values("val_MAPE").drop_duplicates("model", keep="first")
+        if leaderboard.empty:
+            st.error("No runs with validation MAPE either.")
+            return
 
     st.dataframe(
         leaderboard[["model", "run_name", "val_MAPE", "val_RMSE", "test_MAPE", "test_RMSE"]].style.format(
             {
-                "val_MAPE": "{:.2%}",
+                "val_MAPE": "{:.2f}%",  # Already a percentage (not decimal), just add % symbol
                 "val_RMSE": "{:.2f}",
-                "test_MAPE": "{:.2%}",
+                "test_MAPE": "{:.2f}%",  # Already a percentage (not decimal), just add % symbol
                 "test_RMSE": "{:.2f}",
             },
-            na_rep="—",
+            na_rep="None",
         ),
         use_container_width=True,
     )
@@ -526,14 +546,37 @@ def render_benchmarks_tab():
     st.markdown("---")
     st.subheader("Model selection guidance")
 
+    guidance_shown = False
     for _, row in leaderboard.iterrows():
         model_key = row["model"]
-        meta = MODEL_METADATA.get(model_key, {})
+        # Normalize model key to lowercase with underscores for lookup
+        # RandomForest -> random_forest, LightGBM -> lightgbm, etc.
+        model_key_normalized = model_key.lower()
+        if "forest" in model_key_normalized and "_" not in model_key_normalized:
+            model_key_normalized = "random_forest"
+        meta = MODEL_METADATA.get(model_key_normalized, {})
         if not meta:
+            # Show basic info even without metadata
+            with st.expander(f"{model_key} — Best run: {row['run_name']}"):
+                st.markdown(
+                    f"**Validation MAPE**: {row.get('val_MAPE', 'N/A'):.2%}"
+                    if pd.notna(row.get("val_MAPE"))
+                    else "**Validation MAPE**: N/A"
+                )
+                st.markdown(
+                    f"**Test MAPE**: {row.get('test_MAPE', 'N/A'):.2%}"
+                    if pd.notna(row.get("test_MAPE"))
+                    else "**Test MAPE**: N/A"
+                )
+                st.info(f"No detailed metadata available for model: {model_key}")
+            guidance_shown = True
             continue
 
         with st.expander(f"{meta.get('label', model_key)} — Best run: {row['run_name']}"):
-            st.markdown(f"**Validation MAPE**: {row['val_MAPE']:.2%}")
+            if pd.notna(row.get("val_MAPE")):
+                st.markdown(f"**Validation MAPE**: {row['val_MAPE']:.2f}%")
+            if pd.notna(row.get("test_MAPE")):
+                st.markdown(f"**Test MAPE**: {row['test_MAPE']:.2f}%")
             st.markdown(f"**When to use**: {meta.get('when_to_use', 'N/A')}")
             st.markdown(f"**Data regime**: {meta.get('data_regime', 'N/A')}")
 
@@ -546,6 +589,52 @@ def render_benchmarks_tab():
                 st.markdown("**Trade-offs**")
                 for t in meta.get("tradeoffs", []):
                     st.write(f"- {t}")
+
+            # Add hyperparameter analysis
+            st.markdown("---")
+            st.markdown("**🔍 Hyperparameter Analysis**")
+
+            # Get all runs for this model
+            model_runs = runs[runs["model"] == model_key].dropna(subset=["val_MAPE"]).copy()
+
+            if len(model_runs) >= 3:
+                st.markdown(f"Analyzed **{len(model_runs)}** runs for this model:")
+
+                # Extract hyperparameters from MLflow
+                client = _get_mlflow_client()
+                if client:
+                    try:
+                        # Get parameters for best run
+                        best_run_id = row["run_id"]
+                        best_run_data = client.get_run(best_run_id)
+                        best_params = best_run_data.data.params
+
+                        # Filter to model-specific parameters
+                        model_params = {k: v for k, v in best_params.items() if k.startswith("model.")}
+
+                        if model_params:
+                            st.markdown("**Best run parameters**:")
+                            param_cols = st.columns(3)
+                            for idx, (param_name, param_value) in enumerate(sorted(model_params.items())):
+                                col_idx = idx % 3
+                                param_cols[col_idx].metric(label=param_name.replace("model.", ""), value=param_value)
+                        else:
+                            st.info("No hyperparameters logged for this model.")
+
+                    except Exception as e:
+                        st.warning(f"Could not retrieve hyperparameter details: {e}")
+                else:
+                    st.info("MLflow client not available for parameter comparison.")
+            else:
+                st.info(
+                    f"Only {len(model_runs)} run(s) found for this model. "
+                    f"Need at least 3 runs for meaningful hyperparameter analysis."
+                )
+
+        guidance_shown = True
+
+    if not guidance_shown:
+        st.info("No model guidance available. Train some models to see recommendations.")
 
 
 def render_engineering_pov_tab():

@@ -2,15 +2,15 @@
 Configuration management utilities using Hydra and OmegaConf.
 """
 
-import os
+import warnings
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-from dataclasses import dataclass, field
-import warnings
+
 import yaml
 
 try:
-    from omegaconf import OmegaConf, DictConfig
+    from omegaconf import DictConfig, OmegaConf
 
     OMEGACONF_AVAILABLE = True
 except ImportError:
@@ -19,7 +19,6 @@ except ImportError:
     from typing import Dict as DictConfig
 
 try:
-    import hydra
     from hydra import compose, initialize_config_dir
     from hydra.core.global_hydra import GlobalHydra
 
@@ -364,7 +363,7 @@ def create_config_from_args(args: Dict[str, Any]) -> ExperimentConfig:
             # Try to set directly if key exists in config
             try:
                 set_config_value(config_dict, arg_key, arg_value)
-            except:
+            except Exception:
                 warnings.warn(f"Unknown configuration argument: {arg_key}")
 
     return dict_to_config(config_dict)

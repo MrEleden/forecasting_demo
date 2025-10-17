@@ -26,9 +26,10 @@ model:
   subsample: 0.8
 
   # Performance
-  thread_count: -1  # Use all CPU cores
+  thread_count: 4  # Limit threads to avoid memory issues during optimization
   random_seed: 42
   verbose: 0  # 0=silent, 1=info
+  task_type: CPU  # Explicitly use CPU to avoid GPU conflicts
 
   # Early stopping (configured with validation set)
   early_stopping_rounds: 50

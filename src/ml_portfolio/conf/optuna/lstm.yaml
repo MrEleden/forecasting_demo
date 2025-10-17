@@ -1,6 +1,9 @@
 # Optuna hyperparameter optimization configuration for LSTM
 # Search space for LSTM time series forecasting
 
+# Study configuration
+study_name: walmart_lstm_${now:%Y%m%d_%H%M%S}
+
 sampler:
   _target_: optuna.samplers.TPESampler
   seed: 42
@@ -12,19 +15,19 @@ pruner:
   n_warmup_steps: 10
 
 search_space:
-  # LSTM architecture
+  # LSTM architecture (HIGH-PERFORMANCE search space for RTX 4080 SUPER)
   model.hidden_size:
     type: categorical
-    choices: [64, 128, 256, 512]
+    choices: [256, 512, 768, 1024]  # Larger hidden sizes for better GPU utilization
 
   model.num_layers:
     type: int
-    low: 1
-    high: 4
+    low: 2
+    high: 6  # Deeper networks (2-6 layers instead of 1-4)
 
   model.dropout:
     type: float
-    low: 0.0
+    low: 0.1
     high: 0.5
     step: 0.1
 
@@ -40,7 +43,11 @@ search_space:
 
   engine.epochs:
     type: categorical
-    choices: [50, 100, 150, 200]
+    choices: [100, 150, 200, 250]  # More epochs for larger models
+
+  engine.grad_clip:
+    type: categorical
+    choices: [0.5, 1.0, 2.0, 5.0]  # Gradient clipping for deep networks
 
   # Optimizer
   optimizer.weight_decay:
@@ -48,10 +55,10 @@ search_space:
     low: 0.00001
     high: 0.001
 
-  # Data processing
+  # Data processing (larger batches for GPU throughput)
   dataloader.batch_size:
     type: categorical
-    choices: [16, 32, 64, 128]
+    choices: [128, 256, 512, 1024]  # Much larger batches for RTX 4080 SUPER
 
   dataloader.window_size:
     type: int

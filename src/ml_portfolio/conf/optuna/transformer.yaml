@@ -1,6 +1,9 @@
 # Optuna hyperparameter optimization configuration for Transformer
 # Search space for Transformer time series forecasting
 
+# Study configuration
+study_name: walmart_transformer_${now:%Y%m%d_%H%M%S}
+
 sampler:
   _target_: optuna.samplers.TPESampler
   seed: 42

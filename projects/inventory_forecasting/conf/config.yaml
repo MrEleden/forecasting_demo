@@ -13,11 +13,11 @@ experiment:
   name: inventory_forecasting_baseline
   tags: [baseline, inventory]
 
-# Training settings  
+# Training settings
 trainer:
   max_epochs: 100
   patience: 10
-  
+
 # Evaluation settings
 evaluation:
   primary_metric: MAPE

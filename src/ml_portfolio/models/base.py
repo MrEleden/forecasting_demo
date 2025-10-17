@@ -185,9 +185,30 @@ class PyTorchForecaster(BaseForecaster):
 
         # Set device
         if device == "auto":
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            else:
+                self.device = "cpu"
+                import warnings
+
+                warnings.warn(
+                    "CUDA is not available. Training will use CPU, which may be significantly slower. "
+                    "To use GPU, ensure CUDA is properly installed and PyTorch has CUDA support.",
+                    UserWarning,
+                    stacklevel=2,
+                )
         else:
             self.device = device
+            # Warn if user explicitly requested CUDA but it's not available
+            if device == "cuda" and not torch.cuda.is_available():
+                import warnings
+
+                warnings.warn(
+                    "CUDA device requested but CUDA is not available. "
+                    "Training will fail. Check your PyTorch and CUDA installation.",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
     def fit(
         self,
