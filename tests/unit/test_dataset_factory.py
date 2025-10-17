@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
 from ml_portfolio.data.dataset_factory import DatasetFactory
 from ml_portfolio.data.datasets import TimeSeriesDataset
 

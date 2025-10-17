@@ -8,8 +8,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from ml_portfolio.training.train import set_seed, setup_logging
 from omegaconf import DictConfig, OmegaConf
+
+from ml_portfolio.training.train import set_seed, setup_logging
 
 try:
     import torch

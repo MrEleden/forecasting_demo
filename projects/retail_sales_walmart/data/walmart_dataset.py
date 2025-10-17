@@ -1,6 +1,8 @@
 # projects/walmart/data/factory.py
-from ml_portfolio.data.datasets import DatasetFactory
+import pandas as pd
 from ml_portfolio.data.feature_engineering import TimeSeriesFeatureEngineer
+
+from ml_portfolio.data.datasets import DatasetFactory
 
 
 class WalmartDatasetFactory(DatasetFactory):

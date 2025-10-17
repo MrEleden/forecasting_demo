@@ -9,6 +9,7 @@ import pytest
 # Try importing pandera and validation module
 try:
     import pandera as pa
+
     from ml_portfolio.data.validation import (
         WalmartSalesSchema,
         generate_data_quality_report,

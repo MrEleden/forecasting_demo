@@ -5,6 +5,7 @@ Unit tests for data preprocessing pipelines.
 import numpy as np
 import pandas as pd
 import pytest
+
 from ml_portfolio.data.preprocessing import StaticTimeSeriesPreprocessingPipeline, StatisticalPreprocessingPipeline
 
 

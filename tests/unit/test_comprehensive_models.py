@@ -5,6 +5,7 @@ Comprehensive tests for statistical models to increase coverage.
 import numpy as np
 import pandas as pd
 import pytest
+
 from ml_portfolio.models.statistical.catboost import CatBoostForecaster
 from ml_portfolio.models.statistical.random_forest import RandomForestForecaster
 

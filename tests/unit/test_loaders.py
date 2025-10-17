@@ -4,6 +4,7 @@ Unit tests for DataLoader implementations.
 
 import numpy as np
 import pytest
+
 from ml_portfolio.data.datasets import TimeSeriesDataset
 from ml_portfolio.data.loaders import SimpleDataLoader
 

@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
 from ml_portfolio.models.base import StatisticalForecaster
 
 pytest.skip("Base extended tests disabled pending API verification", allow_module_level=True)

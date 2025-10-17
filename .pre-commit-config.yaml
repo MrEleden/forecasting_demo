@@ -4,7 +4,7 @@
 repos:
   # Black - Python code formatter
   - repo: https://github.com/psf/black
-    rev: 24.4.2
+    rev: 25.9.0
     hooks:
       - id: black
         language_version: python3.11
@@ -12,10 +12,11 @@ repos:
 
   # Ruff - Fast Python linter
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
+    rev: v0.14.1
     hooks:
       - id: ruff
         args: ['--fix', '--exit-non-zero-on-fix']
+        exclude: '\.ipynb$'  # Notebooks have different import conventions
 
   # pycodestyle - PEP 8 style checker (via local)
   - repo: local
@@ -29,7 +30,7 @@ repos:
 
   # Trailing whitespace and file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -48,6 +49,13 @@ repos:
         additional_dependencies:
           - mdformat-gfm
           - mdformat-frontmatter
+
+  # Jupyter notebook output cleaner - strips outputs and metadata
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.8.1
+    hooks:
+      - id: nbstripout
+        args: ['--extra-keys', 'metadata.kernelspec metadata.language_info']
 
   # pytest with coverage - Optional coverage reporting (not enforced)
   # Focus on core implementation: data, models, pipelines, training

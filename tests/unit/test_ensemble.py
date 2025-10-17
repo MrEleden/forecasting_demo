@@ -5,10 +5,11 @@ Unit tests for ensemble models.
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.linear_model import LinearRegression, Ridge
+
 from ml_portfolio.models.base import StatisticalForecaster
 from ml_portfolio.models.ensemble.stacking import StackingForecaster
 from ml_portfolio.models.ensemble.voting import VotingForecaster
-from sklearn.linear_model import LinearRegression, Ridge
 
 pytest.skip("Ensemble tests disabled pending API verification", allow_module_level=True)
 

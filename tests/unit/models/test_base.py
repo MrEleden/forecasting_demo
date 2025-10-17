@@ -4,6 +4,7 @@ Unit tests for base forecasting model classes.
 
 import numpy as np
 import pytest
+
 from ml_portfolio.models.base import StatisticalForecaster
 
 

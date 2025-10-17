@@ -3,6 +3,7 @@ Comprehensive tests for evaluation/metrics.py to increase coverage.
 """
 
 import numpy as np
+
 from ml_portfolio.evaluation.metrics import (
     directional_accuracy,
     mae,

@@ -3,6 +3,7 @@ Unit tests for loss functions.
 """
 
 import numpy as np
+
 from ml_portfolio.evaluation.losses import (
     huber_loss,
     mae_loss,

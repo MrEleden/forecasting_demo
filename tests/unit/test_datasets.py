@@ -3,6 +3,7 @@ Unit tests for TimeSeriesDataset class.
 """
 
 import numpy as np
+
 from ml_portfolio.data.datasets import TimeSeriesDataset
 
 

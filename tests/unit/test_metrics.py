@@ -4,6 +4,7 @@ Unit tests for evaluation metrics.
 
 import numpy as np
 import pytest
+
 from ml_portfolio.evaluation.metrics import MAEMetric, MAPEMetric, RMSEMetric
 
 
